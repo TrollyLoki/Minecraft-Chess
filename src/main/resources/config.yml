@@ -1,0 +1,24 @@
+pieces:
+  names:
+    king: 'King'
+    queen: 'Queen'
+    rook: 'Rook'
+    bishop: 'Bishop'
+    knight: 'Knight'
+    pawn: 'Pawn'
+
+  materials:
+    white:
+      king: BIRCH_FENCE_GATE
+      queen: BIRCH_FENCE
+      rook: STRIPPED_BIRCH_LOG
+      bishop: BIRCH_SLAB
+      knight: BIRCH_STAIRS
+      pawn: BIRCH_BUTTON
+    black:
+      king: SPRUCE_FENCE_GATE
+      queen: SPRUCE_FENCE
+      rook: STRIPPED_SPRUCE_LOG
+      bishop: SPRUCE_SLAB
+      knight: SPRUCE_STAIRS
+      pawn: SPRUCE_BUTTON
