@@ -18,27 +18,27 @@ public class Board {
     public static final int SIZE = 8;
 
     private final @NotNull Location cornerLocation;
-    private final @NotNull BlockFace blockFace;
+    private final @NotNull BlockFace attachmentFace;
     private final @NotNull Vector rankDirection, fileDirection;
 
     /**
      * Defines a new chess board.
      *
      * @param cornerLocation location of the a1 square of the board
-     * @param blockFace block face that the item frames are attached to
-     * @param rankDirection vector pointing parallel to the ranks
-     * @param fileDirection vector pointing parallel to the files
+     * @param attachmentFace block face that the item frames are attached to
+     * @param rankDirection  vector pointing parallel to the ranks
+     * @param fileDirection  vector pointing parallel to the files
      */
-    public Board(@NotNull Location cornerLocation, @NotNull BlockFace blockFace, @NotNull Vector rankDirection, @NotNull Vector fileDirection) {
+    public Board(@NotNull Location cornerLocation, @NotNull BlockFace attachmentFace, @NotNull Vector rankDirection, @NotNull Vector fileDirection) {
         if (cornerLocation.getWorld() == null)
             throw new IllegalArgumentException("World must not be null");
-        if (!blockFace.isCartesian())
+        if (!attachmentFace.isCartesian())
             throw new IllegalArgumentException("Block face must be cartesian");
         if (rankDirection.dot(fileDirection) != 0)
             throw new IllegalArgumentException("Ranks and files must be perpendicular");
 
         this.cornerLocation = cornerLocation.toCenterLocation();
-        this.blockFace = blockFace;
+        this.attachmentFace = attachmentFace;
         this.rankDirection = rankDirection.clone().normalize();
         this.fileDirection = fileDirection.clone().normalize();
     }
@@ -75,9 +75,9 @@ public class Board {
         Location location = getLocation(file, rank);
         Block block = location.getBlock();
         for (ItemFrame itemFrame : location.getNearbyEntitiesByType(ItemFrame.class, 1,
-                frame -> frame.getAttachedFace() == blockFace)) {
+                frame -> frame.getAttachedFace() == attachmentFace)) {
 
-            if (itemFrame.getLocation().getBlock().getRelative(itemFrame.getAttachedFace()) == block)
+            if (itemFrame.getLocation().getBlock().getRelative(itemFrame.getAttachedFace()).equals(block))
                 return Optional.of(itemFrame);
 
         }
@@ -140,7 +140,7 @@ public class Board {
 
         ItemStack existingItem = toFrame.get().getItem();
         if (existingItem.getType() != Material.AIR)
-            toFrame.get().getWorld().dropItemNaturally(toFrame.get().getLocation(), existingItem);
+            toFrame.get().getWorld().dropItem(toFrame.get().getLocation(), existingItem);
 
         toFrame.get().setItem(item);
         return true;
@@ -172,9 +172,9 @@ public class Board {
         int toFile = move.charAt(i++) - 'a';
         int toRank = move.charAt(i++) - '1';
 
-        Piece promotionPiece = null;
+        Piece.Type promotionPiece = null;
         if (i < move.length())
-            promotionPiece = Piece.fromLetter(move.charAt(i));
+            promotionPiece = Piece.Type.fromLetter(move.charAt(i));
 
         // Find current pieces
         Optional<Piece> fromPiece = getPieceAt(fromFile, fromRank);
@@ -188,7 +188,7 @@ public class Board {
 
         // Handle promotion
         if (promotionPiece != null)
-            setPieceAt(toFile, toRank, promotionPiece);
+            setPieceAt(toFile, toRank, new Piece(fromPiece.get().getColor(), promotionPiece));
 
         // Handle en passant
         if (capturing && toPiece.isEmpty()) {
@@ -203,7 +203,7 @@ public class Board {
                 ItemStack existingItem = frame.getItem();
                 if (existingItem.getType() != Material.AIR) {
                     frame.setItem(null);
-                    frame.getWorld().dropItemNaturally(frame.getLocation(), existingItem);
+                    frame.getWorld().dropItem(frame.getLocation(), existingItem);
                 }
             });
 
@@ -264,8 +264,9 @@ public class Board {
      * Loads a FEN position onto this board.
      *
      * @param position FEN piece placement data
+     * @see <a href="https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation">Forsyth–Edwards Notation</a>
      */
-    public void loadFEN(@NotNull String position) {
+    public void loadFromFEN(@NotNull String position) {
         int rank = SIZE - 1;
         for (String rankString : position.split("/")) {
 
@@ -276,18 +277,28 @@ public class Board {
                     int emptySquares = Integer.parseInt(String.valueOf(letter));
 
                     for (int i = 0; i < emptySquares; i++) {
-                        setPieceAt(rank, file, null);
+                        setPieceAt(file, rank, null);
                         file++;
                     }
 
                     continue;
                 }
 
-                setPieceAt(rank, file, Piece.fromLetter(letter));
+                setPieceAt(file, rank, Piece.fromLetter(letter));
                 file++;
             }
             rank--;
         }
+    }
+
+    @Override
+    public String toString() {
+        return "Board{" +
+                "cornerLocation=" + cornerLocation +
+                ", attachmentFace=" + attachmentFace +
+                ", rankDirection=" + rankDirection +
+                ", fileDirection=" + fileDirection +
+                '}';
     }
 
 }

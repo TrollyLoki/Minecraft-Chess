@@ -99,7 +99,7 @@ public class Piece {
             return letter;
         }
 
-        private static @NotNull Type fromLetter(char letter) {
+        public static @NotNull Type fromLetter(char letter) {
             letter = Character.toUpperCase(letter);
             if (!LETTER_MAP.containsKey(letter))
                 throw new IllegalArgumentException("Invalid FEN letter");

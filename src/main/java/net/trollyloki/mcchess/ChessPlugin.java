@@ -22,8 +22,13 @@ public class ChessPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
+
         saveDefaultConfig();
         reloadConfig();
+
+        //noinspection DataFlowIssue
+        getCommand("chess").setExecutor(new ChessCommand());
+
     }
 
     @Override

@@ -2,3 +2,11 @@ name: Chess
 version: ${project.version}
 main: net.trollyloki.mcchess.ChessPlugin
 api-version: 1.19
+
+commands:
+  chess:
+    description: Play Chess in Minecraft
+
+permissions:
+  chess.admin:
+    description: Allows admin access to the plugin
