@@ -1,0 +1,4 @@
+name: Chess
+version: ${project.version}
+main: net.trollyloki.mcchess.ChessPlugin
+api-version: 1.19
