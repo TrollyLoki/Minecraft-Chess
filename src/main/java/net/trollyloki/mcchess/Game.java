@@ -42,34 +42,26 @@ public class Game {
      */
     public boolean performMove(@NotNull String move) {
         move = move.toLowerCase(Locale.ROOT);
-        int i = 0;
 
         // Parse string
 
-        int fromFile = move.charAt(i++) - 'a';
-        int fromRank = move.charAt(i++) - '1';
+        int fromFile = move.charAt(0) - 'a';
+        int fromRank = move.charAt(1) - '1';
 
-        boolean capturing = false;
-        if (move.charAt(i) == 'x') {
-            capturing = true;
-            i++;
-        } else if (move.charAt(i) == '-') {
-            i++;
-        }
-
-        int toFile = move.charAt(i++) - 'a';
-        int toRank = move.charAt(i++) - '1';
+        int toFile = move.charAt(2) - 'a';
+        int toRank = move.charAt(3) - '1';
 
         Piece.Type promotionPiece = null;
-        if (i < move.length())
-            promotionPiece = Piece.Type.fromLetter(move.charAt(i));
+        if (move.length() > 4)
+            promotionPiece = Piece.Type.fromLetter(move.charAt(4));
 
         // Find current pieces
         Optional<Piece> pieceOptional = board.getPieceAt(fromFile, fromRank);
         if (pieceOptional.isEmpty())
             return false;
         Piece piece = pieceOptional.get();
-        Optional<Piece> toPiece = capturing ? board.getPieceAt(toFile, toRank) : Optional.empty();
+        Optional<Piece> toPiece = board.getPieceAt(toFile, toRank);
+        boolean capturing = toPiece.isPresent();
 
         // Move piece
         if (!board.movePiece(fromFile, fromRank, toFile, toRank))
@@ -81,25 +73,30 @@ public class Game {
 
         // Handle en passant
 
-        if (piece.getType() == Piece.Type.PAWN && Math.abs(toRank - fromRank) == 2) {
-            enPassantFile = toFile;
-            enPassantRank = (fromRank + toRank) / 2;
-        } else {
-            enPassantFile = NONE;
-            enPassantRank = NONE;
-        }
+        enPassantFile = NONE;
+        enPassantRank = NONE;
 
-        if (capturing && toPiece.isEmpty()) {
+        if (piece.getType() == Piece.Type.PAWN) {
 
-            int pawnRank = toRank + piece.getColor().opposite().getPawnDirection();
+            if (toFile != fromFile && !capturing) {
+                capturing = true;
 
-            board.getItemFrameAt(toFile, pawnRank).ifPresent(frame -> {
-                ItemStack existingItem = frame.getItem();
-                if (existingItem.getType() != Material.AIR) {
-                    frame.setItem(null);
-                    frame.getWorld().dropItem(frame.getLocation(), existingItem);
-                }
-            });
+                int pawnRank = toRank + piece.getColor().opposite().getPawnDirection();
+
+                board.getItemFrameAt(toFile, pawnRank).ifPresent(frame -> {
+                    ItemStack existingItem = frame.getItem();
+                    if (existingItem.getType() != Material.AIR) {
+                        frame.setItem(null);
+                        frame.getWorld().dropItem(frame.getLocation(), existingItem);
+                    }
+                });
+
+            }
+
+            if (Math.abs(toRank - fromRank) == 2) {
+                enPassantFile = toFile;
+                enPassantRank = (fromRank + toRank) / 2;
+            }
 
         }
 

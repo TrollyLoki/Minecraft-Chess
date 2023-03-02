@@ -270,26 +270,21 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                 if (args.length == 3) {
 
                     String current = args[2];
-                    if (current.length() == 2)
-                        options.add(current + "x");
 
-                    if (
-                            current.length() == 0
-                                    || current.length() == 2
-                                    || (current.length() == 3 && current.charAt(2) == 'x')
-                    ) {
+                    if (current.length() == 0 || current.length() == 2) {
 
                         for (char c : "abcdefgh".toCharArray())
                             options.add(current + c);
 
-                    } else if (
-                            current.length() == 1
-                                    || (current.length() == 3 && current.charAt(2) != 'x')
-                                    || (current.length() == 4 && current.charAt(2) == 'x')
-                    ) {
+                    } else if (current.length() == 1 || current.length() == 3) {
 
                         for (char c : "12345678".toCharArray())
                             options.add(current + c);
+
+                    } else if (current.length() == 4) {
+
+                        for (Piece.Type type : Piece.Type.values())
+                            options.add(current + Character.toLowerCase(type.getLetter()));
 
                     }
 
