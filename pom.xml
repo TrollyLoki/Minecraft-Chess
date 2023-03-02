@@ -30,8 +30,8 @@
         </dependency>
         <dependency>
             <groupId>net.andreinc</groupId>
-            <artifactId>neatchess</artifactId>
-            <version>1.0</version>
+            <artifactId>neat-chess</artifactId>
+            <version>0.4.7</version>
         </dependency>
     </dependencies>
 
@@ -57,7 +57,7 @@
                         <configuration>
                             <artifactSet>
                                 <includes>
-                                    <include>net.andreinc:neatchess</include>
+                                    <include>net.andreinc:neat-chess</include>
                                 </includes>
                             </artifactSet>
                         </configuration>

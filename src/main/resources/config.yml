@@ -1,3 +1,5 @@
+engine: '/opt/chess/stockfish'
+
 pieces:
   names:
     king: 'King'

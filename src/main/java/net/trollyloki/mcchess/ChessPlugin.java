@@ -16,12 +16,20 @@ import java.util.Optional;
 
 public class ChessPlugin extends JavaPlugin {
 
+    private static ChessPlugin instance;
+
+    public static ChessPlugin getInstance() {
+        return instance;
+    }
+
+    private static String engineCommand;
     private static final @NotNull Map<Piece.Type, String> PIECE_NAMES = new HashMap<>();
     private static final @NotNull Map<Piece, Material> PIECE_TO_MATERIAL = new HashMap<>();
     private static final @NotNull Map<Material, Piece> MATERIAL_TO_PIECE = new HashMap<>();
 
     @Override
     public void onEnable() {
+        instance = this;
 
         saveDefaultConfig();
         reloadConfig();
@@ -32,9 +40,16 @@ public class ChessPlugin extends JavaPlugin {
     }
 
     @Override
+    public void onDisable() {
+        instance = null;
+    }
+
+    @Override
     public void reloadConfig() {
         super.reloadConfig();
         FileConfiguration config = getConfig();
+
+        engineCommand = config.getString("engine");
 
         PIECE_NAMES.clear();
         PIECE_TO_MATERIAL.clear();
@@ -69,6 +84,10 @@ public class ChessPlugin extends JavaPlugin {
                 MATERIAL_TO_PIECE.put(material, piece);
             }
         }
+    }
+
+    public static String engine() {
+        return engineCommand;
     }
 
     /**

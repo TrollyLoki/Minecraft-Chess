@@ -1,8 +1,10 @@
 package net.trollyloki.mcchess;
 
+import net.andreinc.neatchess.client.UCI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.Command;
@@ -160,11 +162,64 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             return false;
                         }
 
+                    } else if (args[1].equalsIgnoreCase("engine")) {
+
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
+
+                        if (args.length == 2) {
+                            sender.sendMessage(Component.text("Usage: /" + label + " engine <time>", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        long moveTime;
+                        try {
+                            moveTime = Long.parseLong(args[2]);
+                        } catch (NumberFormatException e) {
+                            sender.sendMessage(Component.text("Invalid time", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        String fen = game.toFEN();
+                        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+                            try {
+
+                                UCI uci = new UCI();
+                                uci.start(ChessPlugin.engine());
+                                player.sendMessage(Component.text("Engine started", NamedTextColor.YELLOW));
+
+                                try {
+
+                                    uci.uciNewGame().getResultOrThrow();
+                                    uci.positionFen(fen).getResultOrThrow();
+                                    player.sendMessage(Component.text("FEN loaded", NamedTextColor.YELLOW));
+
+                                    player.sendMessage(Component.text("Finding best move...", NamedTextColor.YELLOW));
+                                    String bestMove = uci.bestMove(moveTime).getResultOrThrow().getCurrent();
+                                    player.sendMessage(Component.text("Found move: " + bestMove, NamedTextColor.GREEN));
+
+                                    Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> game.performMove(bestMove));
+
+                                } finally {
+                                    uci.close();
+                                    player.sendMessage(Component.text("Engine closed", NamedTextColor.GREEN));
+                                }
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
+                            }
+                        });
+                        player.sendMessage(Component.text("Running engine...", NamedTextColor.YELLOW));
+                        return true;
                     }
 
                 }
 
-                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|game|move|newgame|load>", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|game|move|newgame|load|engine>", NamedTextColor.RED));
                 return false;
             }
 
@@ -208,6 +263,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                 options.add("move");
                 options.add("newgame");
                 options.add("load");
+                options.add("engine");
 
             } else if (args[1].equalsIgnoreCase("move")) {
 
