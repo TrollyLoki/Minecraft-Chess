@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
+import java.util.function.Predicate;
 
 public class Board {
 
@@ -97,10 +98,34 @@ public class Board {
     }
 
     /**
+     * Checks if the piece at a square on this board is present and matches a predicate.
+     *
+     * @param file      file index
+     * @param rank      rank index
+     * @param predicate piece predicate
+     * @return {@code true} if the predicate is met, otherwise {@code false}
+     */
+    public boolean isPieceAt(int file, int rank, @NotNull Predicate<Piece> predicate) {
+        return getPieceAt(file, rank).filter(predicate).isPresent();
+    }
+
+    /**
+     * Checks if the piece at a square on this board is present and a certain piece.
+     *
+     * @param file  file index
+     * @param rank  rank index
+     * @param piece piece
+     * @return {@code true} if the piece is there, otherwise {@code false}
+     */
+    public boolean isPieceAt(int file, int rank, @NotNull Piece piece) {
+        return isPieceAt(file, rank, piece::equals);
+    }
+
+    /**
      * Sets the piece at a square on this board.
      *
-     * @param file file index
-     * @param rank rank index
+     * @param file  file index
+     * @param rank  rank index
      * @param piece optional piece
      * @return {@code true} if the piece was set, otherwise {@code false}
      */
