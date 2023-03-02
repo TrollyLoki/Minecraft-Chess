@@ -10,7 +10,6 @@ import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Locale;
 import java.util.Optional;
 
 public class Board {
@@ -143,84 +142,6 @@ public class Board {
             toFrame.get().getWorld().dropItem(toFrame.get().getLocation(), existingItem);
 
         toFrame.get().setItem(item);
-        return true;
-    }
-
-    /**
-     * Perform a move specified by UCI LAN.
-     *
-     * @param move move LAN
-     * @return {@code true} if a piece was moved, otherwise {@code false}
-     */
-    public boolean performMove(@NotNull String move) {
-        move = move.toLowerCase(Locale.ROOT);
-        int i = 0;
-
-        // Parse string
-
-        int fromFile = move.charAt(i++) - 'a';
-        int fromRank = move.charAt(i++) - '1';
-
-        boolean capturing = false;
-        if (move.charAt(i) == 'x') {
-            capturing = true;
-            i++;
-        } else if (move.charAt(i) == '-') {
-            i++;
-        }
-
-        int toFile = move.charAt(i++) - 'a';
-        int toRank = move.charAt(i++) - '1';
-
-        Piece.Type promotionPiece = null;
-        if (i < move.length())
-            promotionPiece = Piece.Type.fromLetter(move.charAt(i));
-
-        // Find current pieces
-        Optional<Piece> fromPiece = getPieceAt(fromFile, fromRank);
-        if (fromPiece.isEmpty())
-            return false;
-        Optional<Piece> toPiece = capturing ? getPieceAt(toFile, toRank) : Optional.empty();
-
-        // Move piece
-        if (!movePiece(fromFile, fromRank, toFile, toRank))
-            return false;
-
-        // Handle promotion
-        if (promotionPiece != null)
-            setPieceAt(toFile, toRank, new Piece(fromPiece.get().getColor(), promotionPiece));
-
-        // Handle en passant
-        if (capturing && toPiece.isEmpty()) {
-
-            int pawnRank = toRank;
-            if (fromPiece.get().getColor() == Piece.Color.BLACK)
-                pawnRank++;
-            else
-                pawnRank--;
-
-            getItemFrameAt(toFile, pawnRank).ifPresent(frame -> {
-                ItemStack existingItem = frame.getItem();
-                if (existingItem.getType() != Material.AIR) {
-                    frame.setItem(null);
-                    frame.getWorld().dropItem(frame.getLocation(), existingItem);
-                }
-            });
-
-        }
-
-        // Handle castling
-        if (fromPiece.get().getType() == Piece.Type.KING) {
-            if (move.startsWith("e1g1")) // white short castling
-                movePiece(7, 0, 5, 0);
-            else if (move.startsWith("e1c1")) // white long castling
-                movePiece(0, 0, 3, 0);
-            else if (move.startsWith("e8g8")) // black short castling
-                movePiece(7, 7, 5, 7);
-            else if (move.startsWith("e8c8")) // black long castling
-                movePiece(0, 7, 3, 7);
-        }
-
         return true;
     }
 

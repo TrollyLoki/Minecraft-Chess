@@ -27,6 +27,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
     public static final String ADMIN_PERMISSION = "chess.admin";
 
     private final Map<UUID, Board> boards = new HashMap<>();
+    private final Map<UUID, Game> games = new HashMap<>();
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
@@ -87,7 +88,13 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                     if (args[1].equalsIgnoreCase("fen")) {
 
-                        String fen = board.toFEN();
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
+
+                        String fen = game.toFEN();
                         player.sendMessage(Component.text(fen)
                                 .hoverEvent(Component.text("Click to copy", NamedTextColor.GRAY).asHoverEvent())
                                 .clickEvent(ClickEvent.copyToClipboard(fen))
@@ -99,7 +106,24 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage(Component.text(board.toString()));
                         return true;
 
+                    } else if (args[1].equalsIgnoreCase("game")) {
+
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
+
+                        player.sendMessage(Component.text(game.toString()));
+                        return true;
+
                     } else if (args[1].equalsIgnoreCase("move")) {
+
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
 
                         if (args.length == 2) {
                             sender.sendMessage(Component.text("Usage: /" + label + " debug move <move>", NamedTextColor.RED));
@@ -107,24 +131,31 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                         }
 
                         try {
-                            board.performMove(args[2]);
+                            game.performMove(args[2]);
                             return true;
                         } catch (IndexOutOfBoundsException e) {
                             player.sendMessage(Component.text("Invalid move: " + e.getMessage(), NamedTextColor.RED));
                             return false;
                         }
 
+                    } else if (args[1].equalsIgnoreCase("newgame")) {
+
+                        games.put(player.getUniqueId(), new Game(board));
+                        player.sendMessage(Component.text("New game started", NamedTextColor.GREEN));
+                        return true;
+
                     } else if (args[1].equalsIgnoreCase("load")) {
 
-                        if (args.length == 2) {
+                        if (args.length < 8) {
                             sender.sendMessage(Component.text("Usage: /" + label + " debug load <fen>", NamedTextColor.RED));
                             return false;
                         }
 
                         try {
-                            board.loadFromFEN(args[2]);
+                            games.put(player.getUniqueId(), Game.fromFEN(String.join(" ", Arrays.copyOfRange(args, 2, 8)), board));
+                            player.sendMessage(Component.text("Game loaded from FEN", NamedTextColor.GREEN));
                             return true;
-                        } catch (IndexOutOfBoundsException e) {
+                        } catch (Exception e) {
                             player.sendMessage(Component.text("Invalid FEN: " + e.getMessage(), NamedTextColor.RED));
                             return false;
                         }
@@ -133,7 +164,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                 }
 
-                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|move|load>", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|game|move|newgame|load>", NamedTextColor.RED));
                 return false;
             }
 
@@ -173,7 +204,9 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                 options.add("fen");
                 options.add("board");
+                options.add("game");
                 options.add("move");
+                options.add("newgame");
                 options.add("load");
 
             } else if (args[1].equalsIgnoreCase("move")) {
