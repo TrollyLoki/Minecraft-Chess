@@ -43,6 +43,20 @@ public class Board {
         this.fileDirection = fileDirection.clone().normalize();
     }
 
+    private static boolean inBounds(int file, int rank) {
+        return file >= 0 && file <= SIZE && rank >= 0 && rank < SIZE;
+    }
+
+    /**
+     * Checks if a square is within the bounds of the board.
+     *
+     * @param square square
+     * @return {@code true} if the file and rank index are valid
+     */
+    public static boolean inBounds(@NotNull Square square) {
+        return inBounds(square.getFile(), square.getRank());
+    }
+
     private static void checkBounds(int file, int rank) throws IndexOutOfBoundsException {
         if (file < 0 || file >= SIZE)
             throw new IndexOutOfBoundsException("File must be between 0 and " + (SIZE - 1));
@@ -50,29 +64,63 @@ public class Board {
             throw new IndexOutOfBoundsException("Rank must be between 0 and " + (SIZE - 1));
     }
 
+    private static void checkBounds(@NotNull Square square) throws IndexOutOfBoundsException {
+        checkBounds(square.getFile(), square.getRank());
+    }
+
     /**
      * Gets the location of a square on this board.
      *
-     * @param file file index
-     * @param rank rank index
+     * @param square square
      * @return location
      */
-    public @NotNull Location getLocation(int file, int rank) {
-        checkBounds(file, rank);
+    public @NotNull Location getLocation(@NotNull Square square) {
+        checkBounds(square);
         return cornerLocation.clone()
-                .add(rankDirection.clone().multiply(file))
-                .add(fileDirection.clone().multiply(rank));
+                .add(rankDirection.clone().multiply(square.getFile()))
+                .add(fileDirection.clone().multiply(square.getRank()));
+    }
+
+    /**
+     * Gets the square on this board at a location.
+     *
+     * @param location location
+     * @return optional square, empty if the location is not on this board
+     */
+    public @NotNull Optional<Square> getSquareAt(@NotNull Location location) {
+        Vector shifted = location.toBlockLocation().subtract(cornerLocation.toBlockLocation()).toVector();
+        if (shifted.getY() != 0)
+            return Optional.empty();
+
+        int file = (int) shifted.dot(rankDirection);
+        int rank = (int) shifted.dot(fileDirection);
+        Square square = new Square(file, rank);
+
+        return Optional.of(square).filter(Board::inBounds);
+    }
+
+    /**
+     * Gets the square on this board that an item frame is for.
+     *
+     * @param itemFrame item frame
+     * @return optional square, empty if the item frame is not on this board
+     */
+    public @NotNull Optional<Square> getSquareOf(@NotNull ItemFrame itemFrame) {
+        if (itemFrame.getAttachedFace() != attachmentFace)
+            return Optional.empty();
+
+        Block block = itemFrame.getLocation().getBlock().getRelative(itemFrame.getAttachedFace());
+        return getSquareAt(block.getLocation());
     }
 
     /**
      * Gets the item frame for a square on this board.
      *
-     * @param file file index
-     * @param rank rank index
+     * @param square square
      * @return optional item frame
      */
-    public @NotNull Optional<ItemFrame> getItemFrameAt(int file, int rank) {
-        Location location = getLocation(file, rank);
+    public @NotNull Optional<ItemFrame> getItemFrameFor(@NotNull Square square) {
+        Location location = getLocation(square);
         Block block = location.getBlock();
         for (ItemFrame itemFrame : location.getNearbyEntitiesByType(ItemFrame.class, 1,
                 frame -> frame.getAttachedFace() == attachmentFace)) {
@@ -87,12 +135,11 @@ public class Board {
     /**
      * Gets the piece at a square on this board.
      *
-     * @param file file index
-     * @param rank rank index
+     * @param square square
      * @return optional piece
      */
-    public @NotNull Optional<Piece> getPieceAt(int file, int rank) {
-        return getItemFrameAt(file, rank)
+    public @NotNull Optional<Piece> getPieceAt(@NotNull Square square) {
+        return getItemFrameFor(square)
                 .map(frame -> frame.getItem().getType())
                 .flatMap(ChessPlugin::getPieceFrom);
     }
@@ -100,37 +147,34 @@ public class Board {
     /**
      * Checks if the piece at a square on this board is present and matches a predicate.
      *
-     * @param file      file index
-     * @param rank      rank index
+     * @param square    square
      * @param predicate piece predicate
      * @return {@code true} if the predicate is met, otherwise {@code false}
      */
-    public boolean isPieceAt(int file, int rank, @NotNull Predicate<Piece> predicate) {
-        return getPieceAt(file, rank).filter(predicate).isPresent();
+    public boolean isPieceAt(@NotNull Square square, @NotNull Predicate<Piece> predicate) {
+        return getPieceAt(square).filter(predicate).isPresent();
     }
 
     /**
      * Checks if the piece at a square on this board is present and a certain piece.
      *
-     * @param file  file index
-     * @param rank  rank index
-     * @param piece piece
+     * @param square square
+     * @param piece  piece
      * @return {@code true} if the piece is there, otherwise {@code false}
      */
-    public boolean isPieceAt(int file, int rank, @NotNull Piece piece) {
-        return isPieceAt(file, rank, piece::equals);
+    public boolean isPieceAt(@NotNull Square square, @NotNull Piece piece) {
+        return isPieceAt(square, piece::equals);
     }
 
     /**
      * Sets the piece at a square on this board.
      *
-     * @param file  file index
-     * @param rank  rank index
-     * @param piece optional piece
+     * @param square square
+     * @param piece  optional piece
      * @return {@code true} if the piece was set, otherwise {@code false}
      */
-    public boolean setPieceAt(int file, int rank, @Nullable Piece piece) {
-        Optional<ItemFrame> frame = getItemFrameAt(file, rank);
+    public boolean setPieceAt(@NotNull Square square, @Nullable Piece piece) {
+        Optional<ItemFrame> frame = getItemFrameFor(square);
         if (frame.isEmpty())
             return false;
 
@@ -141,18 +185,16 @@ public class Board {
     /**
      * Moves a piece on this board.
      *
-     * @param fromFile file index to move from
-     * @param fromRank rank index to move from
-     * @param toFile file index to move to
-     * @param toRank rank index to move to
+     * @param from square to move from
+     * @param to   square to move to
      * @return {@code true} if a piece was moved, otherwise {@code false}
      */
-    public boolean movePiece(int fromFile, int fromRank, int toFile, int toRank) {
-        Optional<ItemFrame> fromFrame = getItemFrameAt(fromFile, fromRank);
+    public boolean movePiece(@NotNull Square from, @NotNull Square to) {
+        Optional<ItemFrame> fromFrame = getItemFrameFor(from);
         if (fromFrame.isEmpty())
             return false;
 
-        Optional<ItemFrame> toFrame = getItemFrameAt(toFile, toRank);
+        Optional<ItemFrame> toFrame = getItemFrameFor(to);
         if (toFrame.isEmpty())
             return false;
 
@@ -183,7 +225,7 @@ public class Board {
             int emptySquares = 0;
             for (int file = 0; file < SIZE; file++) {
 
-                Optional<Piece> piece = getPieceAt(file, rank);
+                Optional<Piece> piece = getPieceAt(new Square(file, rank));
                 if (piece.isEmpty()) {
                     emptySquares++;
                     continue;
@@ -223,14 +265,14 @@ public class Board {
                     int emptySquares = Integer.parseInt(String.valueOf(letter));
 
                     for (int i = 0; i < emptySquares; i++) {
-                        setPieceAt(file, rank, null);
+                        setPieceAt(new Square(file, rank), null);
                         file++;
                     }
 
                     continue;
                 }
 
-                setPieceAt(file, rank, Piece.fromLetter(letter));
+                setPieceAt(new Square(file, rank), Piece.fromLetter(letter));
                 file++;
             }
             rank--;

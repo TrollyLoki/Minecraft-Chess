@@ -3,6 +3,7 @@ package net.trollyloki.mcchess;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -11,27 +12,24 @@ import java.util.Set;
 
 public class Game {
 
-    private static final int NONE = -1;
-
     private final @NotNull Board board;
     private @NotNull Piece.Color activeColor;
     private final @NotNull Set<Piece.Color> canShortCastle, canLongCastle;
-    private int enPassantFile, enPassantRank;
+    private @Nullable Square enPassantSquare;
     private int halfMoves, moveNumber;
 
-    public Game(@NotNull Board board, @NotNull Piece.Color activeColor, @NotNull Set<Piece.Color> canShortCastle, @NotNull Set<Piece.Color> canLongCastle, int enPassantFile, int enPassantRank, int halfMoves, int moveNumber) {
+    public Game(@NotNull Board board, @NotNull Piece.Color activeColor, @NotNull Set<Piece.Color> canShortCastle, @NotNull Set<Piece.Color> canLongCastle, @Nullable Square enPassantSquare, int halfMoves, int moveNumber) {
         this.board = board;
         this.activeColor = activeColor;
         this.canShortCastle = new HashSet<>(canShortCastle);
         this.canLongCastle = new HashSet<>(canLongCastle);
-        this.enPassantFile = enPassantFile;
-        this.enPassantRank = enPassantRank;
+        this.enPassantSquare = enPassantSquare;
         this.halfMoves = halfMoves;
         this.moveNumber = moveNumber;
     }
 
     public Game(@NotNull Board board) {
-        this(board, Piece.Color.WHITE, Set.of(Piece.Color.values()), Set.of(Piece.Color.values()), NONE, NONE, 0, 1);
+        this(board, Piece.Color.WHITE, Set.of(Piece.Color.values()), Set.of(Piece.Color.values()), null, 0, 1);
     }
 
     /**
@@ -72,45 +70,41 @@ public class Game {
 
         // Parse string
 
-        int fromFile = move.charAt(0) - 'a';
-        int fromRank = move.charAt(1) - '1';
-
-        int toFile = move.charAt(2) - 'a';
-        int toRank = move.charAt(3) - '1';
+        Square from = Square.fromString(move.substring(0, 2));
+        Square to = Square.fromString(move.substring(2, 4));
 
         Piece.Type promotionPiece = null;
         if (move.length() > 4)
             promotionPiece = Piece.Type.fromLetter(move.charAt(4));
 
         // Find current pieces
-        Optional<Piece> pieceOptional = board.getPieceAt(fromFile, fromRank);
+        Optional<Piece> pieceOptional = board.getPieceAt(from);
         if (pieceOptional.isEmpty())
             return false;
         Piece piece = pieceOptional.get();
-        Optional<Piece> toPiece = board.getPieceAt(toFile, toRank);
+        Optional<Piece> toPiece = board.getPieceAt(to);
         boolean capturing = toPiece.isPresent();
 
         // Move piece
-        if (!board.movePiece(fromFile, fromRank, toFile, toRank))
+        if (!board.movePiece(from, to))
             return false;
 
         // Handle promotion
         if (promotionPiece != null)
-            board.setPieceAt(toFile, toRank, new Piece(piece.getColor(), promotionPiece));
+            board.setPieceAt(to, new Piece(piece.getColor(), promotionPiece));
 
         // Handle en passant
 
-        enPassantFile = NONE;
-        enPassantRank = NONE;
+        enPassantSquare = null;
 
         if (piece.getType() == Piece.Type.PAWN) {
 
-            if (toFile != fromFile && !capturing) {
+            if (to.getFile() != from.getFile() && !capturing) {
                 capturing = true;
 
-                int pawnRank = toRank + piece.getColor().opposite().getPawnDirection();
+                int pawnRank = to.getRank() + piece.getColor().opposite().getPawnDirection();
 
-                board.getItemFrameAt(toFile, pawnRank).ifPresent(frame -> {
+                board.getItemFrameFor(new Square(to.getFile(), pawnRank)).ifPresent(frame -> {
                     ItemStack existingItem = frame.getItem();
                     if (existingItem.getType() != Material.AIR) {
                         frame.setItem(null);
@@ -120,9 +114,8 @@ public class Game {
 
             }
 
-            if (Math.abs(toRank - fromRank) == 2) {
-                enPassantFile = toFile;
-                enPassantRank = (fromRank + toRank) / 2;
+            if (Math.abs(to.getRank() - from.getRank()) == 2) {
+                enPassantSquare = new Square(to.getFile(), (from.getRank() + to.getRank()) / 2);
             }
 
         }
@@ -131,23 +124,23 @@ public class Game {
 
         if (piece.getType() == Piece.Type.KING) {
             if (move.startsWith("e1g1")) // white short castling
-                board.movePiece(7, 0, 5, 0);
+                board.movePiece(new Square(7, 0), new Square(5, 0));
             else if (move.startsWith("e1c1")) // white long castling
-                board.movePiece(0, 0, 3, 0);
+                board.movePiece(new Square(0, 0), new Square(3, 0));
             else if (move.startsWith("e8g8")) // black short castling
-                board.movePiece(7, 7, 5, 7);
+                board.movePiece(new Square(7, 7), new Square(5, 7));
             else if (move.startsWith("e8c8")) // black long castling
-                board.movePiece(0, 7, 3, 7);
+                board.movePiece(new Square(0, 7), new Square(3, 7));
 
             canShortCastle.remove(piece.getColor());
             canLongCastle.remove(piece.getColor());
         }
 
-        if (piece.getType() == Piece.Type.ROOK && fromRank == piece.getColor().getBackRank()) {
+        if (piece.getType() == Piece.Type.ROOK && from.getRank() == piece.getColor().getBackRank()) {
 
-            if (fromFile == 0)
+            if (from.getFile() == 0)
                 canLongCastle.remove(piece.getColor());
-            else if (fromFile == 7)
+            else if (from.getFile() == 7)
                 canShortCastle.remove(piece.getColor());
 
         }
@@ -170,35 +163,32 @@ public class Game {
         for (Piece.Color color : Piece.Color.values()) {
             if (canShortCastle.contains(color) || canLongCastle.contains(color)) {
                 int backRank = color.getBackRank();
-                boolean kingValid = board.isPieceAt(4, backRank, new Piece(color, Piece.Type.KING));
-                if (!kingValid || !board.isPieceAt(7, backRank, new Piece(color, Piece.Type.ROOK)))
+                boolean kingValid = board.isPieceAt(new Square(4, backRank), new Piece(color, Piece.Type.KING));
+                if (!kingValid || !board.isPieceAt(new Square(7, backRank), new Piece(color, Piece.Type.ROOK)))
                     canShortCastle.remove(color);
-                if (!kingValid || !board.isPieceAt(0, backRank, new Piece(color, Piece.Type.ROOK)))
+                if (!kingValid || !board.isPieceAt(new Square(0, backRank), new Piece(color, Piece.Type.ROOK)))
                     canLongCastle.remove(color);
             }
         }
     }
 
     private boolean isEnPassantSquareValid() {
-        if (enPassantFile == NONE && enPassantRank == NONE)
+        if (enPassantSquare == null)
             return true;
 
-        if (enPassantFile < 0 || enPassantFile >= Board.SIZE)
-            return false;
-        if (enPassantRank < 0 || enPassantRank >= Board.SIZE)
+        if (!Board.inBounds(enPassantSquare))
             return false;
 
-        if (board.getPieceAt(enPassantFile, enPassantRank).isPresent())
+        if (board.getPieceAt(enPassantSquare).isPresent())
             return false;
 
-        int pawnRank = enPassantRank + activeColor.opposite().getPawnDirection();
-        return board.isPieceAt(enPassantFile, pawnRank, new Piece(activeColor.opposite(), Piece.Type.PAWN));
+        int pawnRank = enPassantSquare.getRank() + activeColor.opposite().getPawnDirection();
+        return board.isPieceAt(new Square(enPassantSquare.getFile(), pawnRank), new Piece(activeColor.opposite(), Piece.Type.PAWN));
     }
 
     public void validateEnPassantSquare() {
         if (!isEnPassantSquareValid()) {
-            enPassantFile = NONE;
-            enPassantRank = NONE;
+            enPassantSquare = null;
         }
     }
 
@@ -232,11 +222,10 @@ public class Game {
         }
 
         builder.append(' ');
-        if (enPassantFile == NONE) {
+        if (enPassantSquare == null) {
             builder.append('-');
         } else {
-            builder.append((char) ('a' + enPassantFile));
-            builder.append((char) ('1' + enPassantRank));
+            builder.append(enPassantSquare);
         }
 
         builder.append(' ');
@@ -272,19 +261,16 @@ public class Game {
             }
         }
 
-        int enPassantFile = NONE;
-        int enPassantRank = NONE;
-        if (split[3].charAt(0) != '-') {
-            enPassantFile = split[3].charAt(0) - 'a';
-            enPassantRank = split[3].charAt(1) - '1';
-        }
+        Square enPassantSquare = null;
+        if (split[3].charAt(0) != '-')
+            enPassantSquare = Square.fromString(split[3]);
 
         int halfMoves = Integer.parseInt(split[4]);
         int moves = Integer.parseInt(split[5]);
 
         board.loadFromFEN(split[0]);
 
-        return new Game(board, activeColor, canShortCastle, canLongCastle, enPassantFile, enPassantRank, halfMoves, moves);
+        return new Game(board, activeColor, canShortCastle, canLongCastle, enPassantSquare, halfMoves, moves);
     }
 
     @Override
@@ -294,8 +280,7 @@ public class Game {
                 ", activeColor=" + activeColor +
                 ", canShortCastle=" + canShortCastle +
                 ", canLongCastle=" + canLongCastle +
-                ", enPassantFile=" + enPassantFile +
-                ", enPassantRank=" + enPassantRank +
+                ", enPassantSquare=" + enPassantSquare +
                 ", halfMoves=" + halfMoves +
                 ", moves=" + moveNumber +
                 '}';
