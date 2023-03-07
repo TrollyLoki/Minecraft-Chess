@@ -1,6 +1,7 @@
 package net.trollyloki.mcchess;
 
 import net.andreinc.neatchess.client.UCI;
+import net.andreinc.neatchess.client.exception.UCIRuntimeException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -18,11 +19,15 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 public class ChessCommand implements CommandExecutor, TabCompleter {
 
@@ -30,9 +35,12 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
     private final Map<UUID, Board> boards = new HashMap<>();
     private final Map<UUID, Game> games = new HashMap<>();
+    private final Map<UUID, UCI> engines = new HashMap<>();
+    private final Map<UUID, CompletableFuture<?>> tasks = new HashMap<>();
+    private final Set<UUID> cancelling = new HashSet<>();
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
 
         if (args.length > 0) {
 
@@ -119,6 +127,30 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                         player.sendMessage(Component.text(game.toString()));
                         return true;
 
+                    } else if (args[1].equalsIgnoreCase("turn")) {
+
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
+
+                        if (args.length == 2) {
+                            sender.sendMessage(Component.text("Usage: /" + label + " debug turn <white|black>", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        try {
+
+                            game.setActiveColor(Piece.Color.valueOf(args[2].toUpperCase(Locale.ROOT)));
+                            player.sendMessage(Component.text("Active color set to " + game.getActiveColor(), NamedTextColor.GREEN));
+                            return true;
+
+                        } catch (IllegalArgumentException e) {
+                            sender.sendMessage(Component.text("Usage: /" + label + " debug turn <white|black>", NamedTextColor.RED));
+                            return false;
+                        }
+
                     } else if (args[1].equalsIgnoreCase("move")) {
 
                         if (!games.containsKey(player.getUniqueId())) {
@@ -162,72 +194,170 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             return false;
                         }
 
-                    } else if (args[1].equalsIgnoreCase("engine")) {
-
-                        if (!games.containsKey(player.getUniqueId())) {
-                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
-                            return false;
-                        }
-                        Game game = games.get(player.getUniqueId());
-
-                        if (args.length == 2) {
-                            sender.sendMessage(Component.text("Usage: /" + label + " engine <time>", NamedTextColor.RED));
-                            return false;
-                        }
-
-                        long moveTime;
-                        try {
-                            moveTime = Long.parseLong(args[2]);
-                        } catch (NumberFormatException e) {
-                            sender.sendMessage(Component.text("Invalid time", NamedTextColor.RED));
-                            return false;
-                        }
-
-                        String fen = game.toFEN();
-                        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
-                            try {
-
-                                UCI uci = new UCI();
-                                uci.start(ChessPlugin.engine());
-                                player.sendMessage(Component.text("Engine started", NamedTextColor.YELLOW));
-
-                                try {
-
-                                    uci.uciNewGame().getResultOrThrow();
-                                    uci.positionFen(fen).getResultOrThrow();
-                                    player.sendMessage(Component.text("FEN loaded", NamedTextColor.YELLOW));
-
-                                    player.sendMessage(Component.text("Finding best move...", NamedTextColor.YELLOW));
-                                    String bestMove = uci.bestMove(moveTime).getResultOrThrow().getCurrent();
-                                    player.sendMessage(Component.text("Found move: " + bestMove, NamedTextColor.GREEN));
-
-                                    Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> game.performMove(bestMove));
-
-                                } finally {
-                                    uci.close();
-                                    player.sendMessage(Component.text("Engine closed", NamedTextColor.GREEN));
-                                }
-
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
-                            }
-                        });
-                        player.sendMessage(Component.text("Running engine...", NamedTextColor.YELLOW));
-                        return true;
                     }
 
                 }
 
-                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|game|move|newgame|load|engine>", NamedTextColor.RED));
+                sender.sendMessage(Component.text("Usage: /" + label + " debug <fen|board|game|turn|move|newgame|load|engine>", NamedTextColor.RED));
                 return false;
+
+            } else if (args[0].equalsIgnoreCase("engine") && sender.hasPermission(ADMIN_PERMISSION)) {
+
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can use this command", NamedTextColor.RED));
+                    return false;
+                }
+
+                if (!games.containsKey(player.getUniqueId())) {
+                    player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                    return false;
+                }
+                Game game = games.get(player.getUniqueId());
+
+                if (args.length > 1) {
+
+                    if (args[1].equalsIgnoreCase("start")) {
+
+                        if (engines.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have already started an engine", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        try {
+
+                            UCI engine = new UCI();
+                            engines.put(player.getUniqueId(), engine);
+                            engine.start(ChessPlugin.engine());
+                            sender.sendMessage(Component.text("Started engine", NamedTextColor.GREEN));
+                            return true;
+
+                        } catch (UCIRuntimeException e) {
+                            e.printStackTrace();
+                            engines.remove(player.getUniqueId());
+
+                            sender.sendMessage(Component.text("Failed to start engine!", NamedTextColor.RED));
+                            return false;
+                        }
+
+                    } else if (args[1].equalsIgnoreCase("move")) {
+
+                        if (!engines.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
+                            return false;
+                        }
+                        UCI engine = engines.get(player.getUniqueId());
+
+                        if (args.length == 2) {
+                            sender.sendMessage(Component.text("Usage: /" + label + " engine move <ms>", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        if (tasks.containsKey(player.getUniqueId()) && !tasks.get(player.getUniqueId()).isDone()) {
+                            sender.sendMessage(Component.text("Please wait for your current action to complete", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        try {
+
+                            long moveTime = Long.parseLong(args[2]);
+
+                            player.sendMessage(Component.text("Moving...", NamedTextColor.YELLOW));
+                            tasks.put(player.getUniqueId(), engineMove(game, engine, moveTime).whenComplete((m, e) -> {
+                                if (e != null)
+                                    player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
+                                else
+                                    player.sendMessage(Component.text("Engine played " + m, NamedTextColor.GREEN));
+                            }));
+
+                            return true;
+
+                        } catch (NumberFormatException e) {
+                            sender.sendMessage(Component.text("Invalid milliseconds value: " + args[2], NamedTextColor.RED));
+                            return false;
+                        }
+
+                    } else if (args[1].equalsIgnoreCase("play")) {
+
+                        if (!engines.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
+                            return false;
+                        }
+                        UCI engine = engines.get(player.getUniqueId());
+
+                        if (args.length == 2) {
+                            sender.sendMessage(Component.text("Usage: /" + label + " engine play <ms>", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        if (tasks.containsKey(player.getUniqueId()) && !tasks.get(player.getUniqueId()).isDone()) {
+                            sender.sendMessage(Component.text("Please wait for your current action to complete", NamedTextColor.RED));
+                            return false;
+                        }
+
+                        try {
+
+                            long moveTime = Long.parseLong(args[2]);
+
+                            player.sendMessage(Component.text("Playing...", NamedTextColor.YELLOW));
+                            cancelling.remove(player.getUniqueId());
+
+                            Supplier<CompletableFuture<?>> supplier = () -> engineMove(game, engine, moveTime).whenComplete((m, e) -> {
+                                if (e != null)
+                                    player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
+                                else {
+                                    player.sendMessage(Component.text("Engine played " + m, NamedTextColor.GREEN));
+                                }
+                            });
+                            playLoopHelper(player.getUniqueId(), supplier);
+                            return true;
+
+                        } catch (NumberFormatException e) {
+                            sender.sendMessage(Component.text("Invalid milliseconds value: " + args[2], NamedTextColor.RED));
+                            return false;
+                        }
+
+                    } else if (args[1].equalsIgnoreCase("cancel")) {
+
+                        cancelling.add(player.getUniqueId());
+                        sender.sendMessage(Component.text("Cancelling...", NamedTextColor.YELLOW));
+                        return true;
+
+                    } else if (args[1].equalsIgnoreCase("stop")) {
+
+                        if (!engines.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
+                            return false;
+                        }
+                        UCI engine = engines.get(player.getUniqueId());
+
+                        try {
+
+                            engine.close();
+                            engines.remove(player.getUniqueId());
+                            sender.sendMessage(Component.text("Stopped engine", NamedTextColor.GREEN));
+                            return true;
+
+                        } catch (UCIRuntimeException e) {
+                            e.printStackTrace();
+
+                            sender.sendMessage(Component.text("Failed to stop engine!", NamedTextColor.RED));
+                            return false;
+                        }
+
+                    }
+
+                }
+
+                sender.sendMessage(Component.text("Usage: /" + label + " engine <start|move|play|cancel|stop>", NamedTextColor.RED));
+                return false;
+
             }
 
         }
 
         String options = "board";
         if (sender.hasPermission(ADMIN_PERMISSION))
-            options += "|debug";
+            options += "|debug|engine";
         sender.sendMessage(Component.text("Usage: /" + label + " <" + options + ">", NamedTextColor.RED));
         return false;
     }
@@ -239,8 +369,10 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
         if (args.length <= 1) {
 
             options.add("board");
-            if (sender.hasPermission(ADMIN_PERMISSION))
+            if (sender.hasPermission(ADMIN_PERMISSION)) {
                 options.add("debug");
+                options.add("engine");
+            }
 
         } else if (args[0].equalsIgnoreCase("board")) {
 
@@ -260,10 +392,10 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                 options.add("fen");
                 options.add("board");
                 options.add("game");
+                options.add("turn");
                 options.add("move");
                 options.add("newgame");
                 options.add("load");
-                options.add("engine");
 
             } else if (args[1].equalsIgnoreCase("move")) {
 
@@ -290,6 +422,27 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                 }
 
+            } else if (args[1].equalsIgnoreCase("turn")) {
+
+                if (args.length == 3) {
+
+                    for (Piece.Color color : Piece.Color.values())
+                        options.add(color.name().toLowerCase(Locale.ROOT));
+
+                }
+
+            }
+
+        } else if (args[0].equalsIgnoreCase("engine") && sender.hasPermission(ADMIN_PERMISSION)) {
+
+            if (args.length == 2) {
+
+                options.add("start");
+                options.add("move");
+                options.add("play");
+                options.add("cancel");
+                options.add("stop");
+
             }
 
         }
@@ -297,6 +450,41 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
         String prefix = args[args.length - 1].toLowerCase(Locale.ROOT);
         options.removeIf(option -> !option.toLowerCase(Locale.ROOT).startsWith(prefix));
         return options;
+    }
+
+    private void playLoopHelper(@NotNull UUID key, @NotNull Supplier<CompletableFuture<?>> futureSupplier) {
+        tasks.put(key, futureSupplier.get().thenRun(() -> {
+            if (!cancelling.contains(key))
+                playLoopHelper(key, futureSupplier);
+        }));
+    }
+
+    public static @NotNull CompletableFuture<String> engineMove(@NotNull Game game, @NotNull UCI engine, long moveTime) {
+        String fen = game.toFEN();
+
+        CompletableFuture<String> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+            try {
+
+                engine.positionFen(fen).getResultOrThrow();
+                String move = engine.bestMove(moveTime).getResultOrThrow().getCurrent();
+
+                Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
+                    try {
+                        game.performMove(move);
+                        future.complete(move);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        future.completeExceptionally(e);
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
 }

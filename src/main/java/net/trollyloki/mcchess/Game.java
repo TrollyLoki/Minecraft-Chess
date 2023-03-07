@@ -17,9 +17,9 @@ public class Game {
     private @NotNull Piece.Color activeColor;
     private final @NotNull Set<Piece.Color> canShortCastle, canLongCastle;
     private int enPassantFile, enPassantRank;
-    private int halfMoves, moves;
+    private int halfMoves, moveNumber;
 
-    public Game(@NotNull Board board, @NotNull Piece.Color activeColor, @NotNull Set<Piece.Color> canShortCastle, @NotNull Set<Piece.Color> canLongCastle, int enPassantFile, int enPassantRank, int halfMoves, int moves) {
+    public Game(@NotNull Board board, @NotNull Piece.Color activeColor, @NotNull Set<Piece.Color> canShortCastle, @NotNull Set<Piece.Color> canLongCastle, int enPassantFile, int enPassantRank, int halfMoves, int moveNumber) {
         this.board = board;
         this.activeColor = activeColor;
         this.canShortCastle = new HashSet<>(canShortCastle);
@@ -27,11 +27,38 @@ public class Game {
         this.enPassantFile = enPassantFile;
         this.enPassantRank = enPassantRank;
         this.halfMoves = halfMoves;
-        this.moves = moves;
+        this.moveNumber = moveNumber;
     }
 
     public Game(@NotNull Board board) {
         this(board, Piece.Color.WHITE, Set.of(Piece.Color.values()), Set.of(Piece.Color.values()), NONE, NONE, 0, 1);
+    }
+
+    /**
+     * Gets the board this game is being played on.
+     *
+     * @return board
+     */
+    public @NotNull Board getBoard() {
+        return board;
+    }
+
+    /**
+     * Gets the color that moves next.
+     *
+     * @return piece color
+     */
+    public @NotNull Piece.Color getActiveColor() {
+        return activeColor;
+    }
+
+    /**
+     * Sets the color that moves next.
+     *
+     * @param activeColor piece color
+     */
+    public void setActiveColor(@NotNull Piece.Color activeColor) {
+        this.activeColor = activeColor;
     }
 
     /**
@@ -134,7 +161,7 @@ public class Game {
 
         activeColor = activeColor.opposite();
         if (activeColor == Piece.Color.WHITE)
-            moves++;
+            moveNumber++;
 
         return true;
     }
@@ -216,7 +243,7 @@ public class Game {
         builder.append(halfMoves);
 
         builder.append(' ');
-        builder.append(moves);
+        builder.append(moveNumber);
 
         return builder.toString();
     }
@@ -270,7 +297,7 @@ public class Game {
                 ", enPassantFile=" + enPassantFile +
                 ", enPassantRank=" + enPassantRank +
                 ", halfMoves=" + halfMoves +
-                ", moves=" + moves +
+                ", moves=" + moveNumber +
                 '}';
     }
 
