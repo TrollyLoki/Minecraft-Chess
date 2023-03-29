@@ -5,6 +5,9 @@ import net.andreinc.neatchess.client.exception.UCIRuntimeException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.board.Piece;
+import net.trollyloki.mcchess.game.Game;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
@@ -142,7 +145,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                         try {
 
-                            game.setActiveColor(Piece.Color.valueOf(args[2].toUpperCase(Locale.ROOT)));
+                            game.setActiveColor(Color.valueOf(args[2].toUpperCase(Locale.ROOT)));
                             player.sendMessage(Component.text("Active color set to " + game.getActiveColor(), NamedTextColor.GREEN));
                             return true;
 
@@ -426,7 +429,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                 if (args.length == 3) {
 
-                    for (Piece.Color color : Piece.Color.values())
+                    for (Color color : Color.values())
                         options.add(color.name().toLowerCase(Locale.ROOT));
 
                 }

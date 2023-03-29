@@ -1,4 +1,4 @@
-package net.trollyloki.mcchess;
+package net.trollyloki.mcchess.board;
 
 import org.jetbrains.annotations.NotNull;
 

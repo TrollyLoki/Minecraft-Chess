@@ -1,3 +1,4 @@
+default-site: 'Minecraft'
 engine: '/opt/chess/stockfish'
 
 pieces:

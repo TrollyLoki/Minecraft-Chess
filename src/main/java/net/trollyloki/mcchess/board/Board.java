@@ -1,5 +1,6 @@
-package net.trollyloki.mcchess;
+package net.trollyloki.mcchess.board;
 
+import net.trollyloki.mcchess.ChessPlugin;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -21,6 +22,8 @@ public class Board {
     private final @NotNull BlockFace attachmentFace;
     private final @NotNull Vector rankDirection, fileDirection;
 
+    private @NotNull String site = ChessPlugin.getDefaultSite();
+
     /**
      * Defines a new chess board.
      *
@@ -41,6 +44,24 @@ public class Board {
         this.attachmentFace = attachmentFace;
         this.rankDirection = rankDirection.clone().normalize();
         this.fileDirection = fileDirection.clone().normalize();
+    }
+
+    /**
+     * Gets the site of this board.
+     *
+     * @return site string
+     */
+    public @NotNull String getSite() {
+        return site;
+    }
+
+    /**
+     * Sets the site of this board.
+     *
+     * @param site site string
+     */
+    public void setSite(@NotNull String site) {
+        this.site = site;
     }
 
     private static boolean inBounds(int file, int rank) {

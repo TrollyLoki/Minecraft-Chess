@@ -1,6 +1,7 @@
 package net.trollyloki.mcchess;
 
 import net.kyori.adventure.text.Component;
+import net.trollyloki.mcchess.board.Piece;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -22,6 +23,7 @@ public class ChessPlugin extends JavaPlugin {
         return instance;
     }
 
+    private static String defaultSite;
     private static String engineCommand;
     private static final @NotNull Map<Piece.Type, String> PIECE_NAMES = new HashMap<>();
     private static final @NotNull Map<Piece, Material> PIECE_TO_MATERIAL = new HashMap<>();
@@ -50,6 +52,7 @@ public class ChessPlugin extends JavaPlugin {
         FileConfiguration config = getConfig();
 
         engineCommand = config.getString("engine");
+        defaultSite = config.getString("default-site");
 
         PIECE_NAMES.clear();
         PIECE_TO_MATERIAL.clear();
@@ -68,7 +71,7 @@ public class ChessPlugin extends JavaPlugin {
                 PIECE_NAMES.put(type, name);
             }
 
-            for (Piece.Color color : Piece.Color.values()) {
+            for (Color color : Color.values()) {
                 Piece piece = new Piece(color, type);
 
                 String path = "pieces.materials.%s.%s".formatted(
@@ -88,6 +91,15 @@ public class ChessPlugin extends JavaPlugin {
 
     public static String engine() {
         return engineCommand;
+    }
+
+    /**
+     * Get the default site for this server.
+     *
+     * @return default site string
+     */
+    public static String getDefaultSite() {
+        return defaultSite;
     }
 
     /**

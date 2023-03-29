@@ -1,24 +1,47 @@
-package net.trollyloki.mcchess;
+package net.trollyloki.mcchess.game;
 
+import net.trollyloki.mcchess.Color;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.board.Piece;
+import net.trollyloki.mcchess.board.Square;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 public class Game {
 
+    private static final @NotNull String STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
     private final @NotNull Board board;
-    private @NotNull Piece.Color activeColor;
-    private final @NotNull Set<Piece.Color> canShortCastle, canLongCastle;
+    private @Nullable String initialFen;
+
+    private @NotNull String event = "Minecraft Chess Game";
+    private @NotNull LocalDateTime startTime = LocalDateTime.now();
+    private int round = 1;
+
+    private final @NotNull List<String> moves = new LinkedList<>();
+    private @NotNull String result = "*";
+
+    private final @NotNull Map<Color, ChessPlayer> players = new HashMap<>();
+
+    private @NotNull Color activeColor;
+    private final @NotNull Set<Color> canShortCastle, canLongCastle;
     private @Nullable Square enPassantSquare;
     private int halfMoves, moveNumber;
 
-    public Game(@NotNull Board board, @NotNull Piece.Color activeColor, @NotNull Set<Piece.Color> canShortCastle, @NotNull Set<Piece.Color> canLongCastle, @Nullable Square enPassantSquare, int halfMoves, int moveNumber) {
+    public Game(@NotNull Board board, @NotNull Color activeColor, @NotNull Set<Color> canShortCastle, @NotNull Set<Color> canLongCastle, @Nullable Square enPassantSquare, int halfMoves, int moveNumber) {
         this.board = board;
         this.activeColor = activeColor;
         this.canShortCastle = new HashSet<>(canShortCastle);
@@ -26,10 +49,15 @@ public class Game {
         this.enPassantSquare = enPassantSquare;
         this.halfMoves = halfMoves;
         this.moveNumber = moveNumber;
+
+        String fen = toFEN();
+        if (!fen.equals(STANDARD_FEN))
+            this.initialFen = toFEN();
     }
 
     public Game(@NotNull Board board) {
-        this(board, Piece.Color.WHITE, Set.of(Piece.Color.values()), Set.of(Piece.Color.values()), null, 0, 1);
+        this(board, Color.WHITE, Set.of(Color.values()), Set.of(Color.values()), null, 0, 1);
+        validateCastling();
     }
 
     /**
@@ -46,7 +74,7 @@ public class Game {
      *
      * @return piece color
      */
-    public @NotNull Piece.Color getActiveColor() {
+    public @NotNull Color getActiveColor() {
         return activeColor;
     }
 
@@ -55,7 +83,7 @@ public class Game {
      *
      * @param activeColor piece color
      */
-    public void setActiveColor(@NotNull Piece.Color activeColor) {
+    public void setActiveColor(@NotNull Color activeColor) {
         this.activeColor = activeColor;
     }
 
@@ -153,14 +181,14 @@ public class Game {
             halfMoves++;
 
         activeColor = activeColor.opposite();
-        if (activeColor == Piece.Color.WHITE)
+        if (activeColor == Color.WHITE)
             moveNumber++;
 
         return true;
     }
 
     public void validateCastling() {
-        for (Piece.Color color : Piece.Color.values()) {
+        for (Color color : Color.values()) {
             if (canShortCastle.contains(color) || canLongCastle.contains(color)) {
                 int backRank = color.getBackRank();
                 boolean kingValid = board.isPieceAt(new Square(4, backRank), new Piece(color, Piece.Type.KING));
@@ -211,13 +239,13 @@ public class Game {
         if (canShortCastle.isEmpty() && canLongCastle.isEmpty()) {
             builder.append('-');
         } else {
-            if (canShortCastle.contains(Piece.Color.WHITE))
+            if (canShortCastle.contains(Color.WHITE))
                 builder.append('K');
-            if (canLongCastle.contains(Piece.Color.WHITE))
+            if (canLongCastle.contains(Color.WHITE))
                 builder.append('Q');
-            if (canShortCastle.contains(Piece.Color.BLACK))
+            if (canShortCastle.contains(Color.BLACK))
                 builder.append('k');
-            if (canLongCastle.contains(Piece.Color.BLACK))
+            if (canLongCastle.contains(Color.BLACK))
                 builder.append('q');
         }
 
@@ -248,16 +276,16 @@ public class Game {
     public static @NotNull Game fromFEN(@NotNull String fen, @NotNull Board board) {
         String[] split = fen.split(" ");
 
-        Piece.Color activeColor = Piece.Color.fromLetter(split[1].charAt(0));
+        Color activeColor = Color.fromLetter(split[1].charAt(0));
 
-        Set<Piece.Color> canShortCastle = new HashSet<>(2);
-        Set<Piece.Color> canLongCastle = new HashSet<>(2);
+        Set<Color> canShortCastle = new HashSet<>(2);
+        Set<Color> canLongCastle = new HashSet<>(2);
         for (char letter : split[2].toCharArray()) {
             switch (letter) {
-                case 'K' -> canShortCastle.add(Piece.Color.WHITE);
-                case 'Q' -> canLongCastle.add(Piece.Color.WHITE);
-                case 'k' -> canShortCastle.add(Piece.Color.BLACK);
-                case 'q' -> canLongCastle.add(Piece.Color.BLACK);
+                case 'K' -> canShortCastle.add(Color.WHITE);
+                case 'Q' -> canLongCastle.add(Color.WHITE);
+                case 'k' -> canShortCastle.add(Color.BLACK);
+                case 'q' -> canLongCastle.add(Color.BLACK);
             }
         }
 
@@ -271,6 +299,45 @@ public class Game {
         board.loadFromFEN(split[0]);
 
         return new Game(board, activeColor, canShortCastle, canLongCastle, enPassantSquare, halfMoves, moves);
+    }
+
+    private static final @NotNull DateTimeFormatter
+            PGN_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy.MM.dd", Locale.ROOT),
+            PGN_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.ROOT);
+
+    /**
+     * Saves this game in PGN format.
+     *
+     * @return PGN text
+     */
+    public @NotNull String toPGN() {
+        StringBuilder builder = new StringBuilder();
+
+        // Required tags
+        builder.append("[Event \"").append(event).append("\"]\n");
+        builder.append("[Site \"").append(board.getSite()).append("\"]\n");
+        builder.append("[Date \"").append(startTime.format(PGN_DATE_FORMAT)).append("\"]\n");
+        builder.append("[Round \"").append(round).append("\"]\n");
+        builder.append("[White \"").append(
+                players.containsKey(Color.WHITE) ? players.get(Color.WHITE).getName() : "White"
+        ).append("\"]\n");
+        builder.append("[Black \"").append(
+                players.containsKey(Color.BLACK) ? players.get(Color.BLACK).getName() : "Black"
+        ).append("\"]\n");
+        builder.append("[Result \"").append(result).append("\"]\n");
+
+        // Optional tags
+        builder.append("[Time \"").append(startTime.format(PGN_TIME_FORMAT)).append("\"]\n");
+        builder.append("[Mode \"ICS\"]\n");
+        if (initialFen != null) {
+            builder.append("[SetUp \"1\"]\n");
+            builder.append("[FEN \"").append(initialFen).append("\"]\n");
+        }
+
+        // Movetext
+        //TODO
+
+        return builder.toString();
     }
 
     @Override
