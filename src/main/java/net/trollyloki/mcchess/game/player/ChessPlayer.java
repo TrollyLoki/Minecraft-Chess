@@ -1,5 +1,6 @@
-package net.trollyloki.mcchess.game;
+package net.trollyloki.mcchess.game.player;
 
+import net.trollyloki.mcchess.game.Game;
 import org.jetbrains.annotations.NotNull;
 
 public interface ChessPlayer {

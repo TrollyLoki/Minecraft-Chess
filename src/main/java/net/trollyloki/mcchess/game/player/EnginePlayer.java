@@ -1,10 +1,11 @@
-package net.trollyloki.mcchess.game;
+package net.trollyloki.mcchess.game.player;
 
 import net.andreinc.neatchess.client.UCI;
 import net.andreinc.neatchess.client.UCIResponse;
 import net.andreinc.neatchess.client.exception.UCIRuntimeException;
 import net.andreinc.neatchess.client.model.BestMove;
 import net.andreinc.neatchess.client.model.EngineInfo;
+import net.trollyloki.mcchess.game.Game;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.Reference;

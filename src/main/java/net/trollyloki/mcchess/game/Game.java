@@ -4,6 +4,7 @@ import net.trollyloki.mcchess.Color;
 import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
+import net.trollyloki.mcchess.game.player.ChessPlayer;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
