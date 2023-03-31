@@ -3,8 +3,10 @@ package net.trollyloki.mcchess;
 import net.kyori.adventure.text.Component;
 import net.trollyloki.mcchess.board.Piece;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -23,6 +25,8 @@ public class ChessPlugin extends JavaPlugin {
         return instance;
     }
 
+    private static NamespacedKey pieceTypeKey;
+
     private static String defaultSite;
     private static String engineCommand;
     private static final @NotNull Map<Piece.Type, String> PIECE_NAMES = new HashMap<>();
@@ -32,6 +36,8 @@ public class ChessPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+
+        pieceTypeKey = new NamespacedKey(this, "piece_type");
 
         saveDefaultConfig();
         reloadConfig();
@@ -134,7 +140,10 @@ public class ChessPlugin extends JavaPlugin {
             return null;
 
         ItemStack item = new ItemStack(getMaterialFor(piece));
-        item.editMeta(meta -> meta.displayName(Component.text(getName(piece.getType()))));
+        item.editMeta(meta -> {
+            meta.displayName(Component.text(getName(piece.getType())));
+            meta.getPersistentDataContainer().set(pieceTypeKey, PersistentDataType.STRING, piece.getType().name());
+        });
         return item;
     }
 
