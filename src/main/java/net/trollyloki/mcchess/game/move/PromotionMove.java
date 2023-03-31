@@ -13,7 +13,7 @@ public class PromotionMove extends NormalMove {
         this.promotionType = promotionType;
     }
 
-    public Piece.@NotNull Type getPromotionType() {
+    public @NotNull Piece.Type getPromotionType() {
         return promotionType;
     }
 

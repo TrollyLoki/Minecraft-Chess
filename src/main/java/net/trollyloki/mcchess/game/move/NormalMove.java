@@ -17,7 +17,7 @@ public class NormalMove implements Move {
         this.capture = capture;
     }
 
-    public Piece.@NotNull Type getPieceType() {
+    public @NotNull Piece.Type getPieceType() {
         return pieceType;
     }
 

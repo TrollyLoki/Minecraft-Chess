@@ -21,10 +21,13 @@ import java.util.Set;
 
 public class Game {
 
-    private static final @NotNull String STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    public static final @NotNull String STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     private final @NotNull Board board;
-    private @Nullable String initialFen;
+
+    private final @Nullable String initialFen;
+    private final int initialMoveNumber;
+    private final @NotNull Color initialActiveColor;
 
     private @NotNull String event = "Minecraft Chess Game";
     private @NotNull LocalDateTime startTime = LocalDateTime.now();
@@ -50,8 +53,9 @@ public class Game {
         this.moveNumber = moveNumber;
 
         String fen = toFEN();
-        if (!fen.equals(STANDARD_FEN))
-            this.initialFen = toFEN();
+        this.initialFen = fen.equals(STANDARD_FEN) ? null : fen;
+        this.initialMoveNumber = this.moveNumber;
+        this.initialActiveColor = this.activeColor;
     }
 
     public Game(@NotNull Board board) {
@@ -66,6 +70,30 @@ public class Game {
      */
     public @NotNull Board getBoard() {
         return board;
+    }
+
+    public @NotNull String getEvent() {
+        return event;
+    }
+
+    public void setEvent(@NotNull String event) {
+        this.event = event;
+    }
+
+    public @NotNull LocalDateTime getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime() {
+        this.startTime = LocalDateTime.now();
+    }
+
+    public int getRound() {
+        return round;
+    }
+
+    public void setRound(int round) {
+        this.round = round;
     }
 
     /**
@@ -326,7 +354,30 @@ public class Game {
         }
 
         // Movetext
-        //TODO
+        builder.append('\n');
+
+        if (initialActiveColor == Color.BLACK)
+            builder.append(initialMoveNumber).append("...");
+
+        int moveNumber = initialMoveNumber;
+        Color activeColor = initialActiveColor;
+        for (String san : moves) {
+            if (activeColor == Color.WHITE) {
+                if (moveNumber != initialMoveNumber)
+                    builder.append(' ');
+                builder.append(moveNumber).append('.');
+            }
+
+            builder.append(' ');
+            builder.append(san);
+
+            if (activeColor == Color.BLACK)
+                moveNumber++;
+            activeColor = activeColor.opposite();
+        }
+
+        if (!result.equals("*"))
+            builder.append(' ').append(result);
 
         return builder.toString();
     }
