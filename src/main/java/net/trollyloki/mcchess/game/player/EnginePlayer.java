@@ -2,7 +2,6 @@ package net.trollyloki.mcchess.game.player;
 
 import net.andreinc.neatchess.client.UCI;
 import net.andreinc.neatchess.client.UCIResponse;
-import net.andreinc.neatchess.client.exception.UCIRuntimeException;
 import net.andreinc.neatchess.client.model.BestMove;
 import net.andreinc.neatchess.client.model.EngineInfo;
 import net.trollyloki.mcchess.game.Game;
@@ -14,9 +13,10 @@ import java.lang.ref.WeakReference;
 public class EnginePlayer implements ChessPlayer, AutoCloseable {
 
     private final @NotNull UCI engine;
+    private boolean closed = false;
+
     private @NotNull String name;
     private final @NotNull EngineInfo engineInfo;
-    private boolean closed = false;
 
     private int depth = 0;
     private long moveTime = 0;
@@ -37,7 +37,7 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
             this.engineInfo = this.engine.start(engine).getResultOrThrow();
             this.name = this.engineInfo.getName();
 
-        } catch (UCIRuntimeException e) {
+        } catch (Exception e) {
             this.engine.close();
             throw e;
         }
@@ -127,15 +127,18 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
 
     @Override
     public boolean play(@NotNull Game game) {
-        if (!lastGame.refersTo(game))
+        if (!lastGame.refersTo(game)) {
             engine.uciNewGame();
+            lastGame = new WeakReference<>(game);
+        }
         engine.positionFen(game.toFEN());
 
-        BestMove bestMove = bestMove().getResultOrThrow();
-        if (!lastGame.refersTo(game))
-            lastGame = new WeakReference<>(game);
-
-        return game.performMove(bestMove.getCurrent());
+        BestMove bestMove = bestMove().getResult();
+        if (bestMove != null) {
+            game.performUciMove(bestMove.getCurrent());
+            return true;
+        }
+        return false;
     }
 
     /**

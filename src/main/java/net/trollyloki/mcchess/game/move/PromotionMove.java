@@ -1,8 +1,11 @@
 package net.trollyloki.mcchess.game.move;
 
+import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Optional;
 
 public class PromotionMove extends NormalMove {
 
@@ -15,6 +18,14 @@ public class PromotionMove extends NormalMove {
 
     public @NotNull Piece.Type getPromotionType() {
         return promotionType;
+    }
+
+    @Override
+    public void play(@NotNull Board board) {
+        super.play(board);
+        Optional<Piece> promotionPiece = board.getPieceAt(to)
+                .map(Piece::getColor).map(color -> new Piece(color, promotionType));
+        promotionPiece.ifPresent(piece -> board.setPieceAt(to, piece));
     }
 
     @Override

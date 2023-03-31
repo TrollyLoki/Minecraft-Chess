@@ -1,8 +1,11 @@
 package net.trollyloki.mcchess.game.move;
 
+import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Optional;
 
 public class NormalMove implements Move {
 
@@ -31,6 +34,26 @@ public class NormalMove implements Move {
 
     public boolean isCapture() {
         return capture;
+    }
+
+    @Override
+    public boolean isPawnMoveOrCapture() {
+        return capture || pieceType == Piece.Type.PAWN;
+    }
+
+    @Override
+    public @NotNull Optional<Square> getEnPassantSquare() {
+        if (pieceType == Piece.Type.PAWN && Math.abs(to.getRank() - from.getRank()) == 2)
+            return Optional.of(new Square(to.getFile(), (from.getRank() + to.getRank()) / 2));
+        else
+            return Optional.empty();
+    }
+
+    @Override
+    public void play(@NotNull Board board) {
+        board.movePiece(from, to);
+        if (pieceType == Piece.Type.PAWN && capture && board.getPieceAt(to).isEmpty())
+            board.setPieceAt(new Square(to.getFile(), from.getRank()), null);
     }
 
     @Override

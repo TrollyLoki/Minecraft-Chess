@@ -1,7 +1,11 @@
 package net.trollyloki.mcchess.game.move;
 
 import net.trollyloki.mcchess.Color;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.board.Square;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Optional;
 
 public class CastleMove implements Move {
 
@@ -19,6 +23,28 @@ public class CastleMove implements Move {
 
     public boolean isQueenside() {
         return queenside;
+    }
+
+    @Override
+    public boolean isPawnMoveOrCapture() {
+        return false;
+    }
+
+    @Override
+    public @NotNull Optional<Square> getEnPassantSquare() {
+        return Optional.empty();
+    }
+
+    @Override
+    public void play(@NotNull Board board) {
+        int rank = color.getBackRank();
+        if (queenside) {
+            board.movePiece(new Square(4, rank), new Square(2, rank)); // king
+            board.movePiece(new Square(0, rank), new Square(3, rank)); // rook
+        } else {
+            board.movePiece(new Square(4, rank), new Square(6, rank)); // king
+            board.movePiece(new Square(7, rank), new Square(5, rank)); // rook
+        }
     }
 
     @Override

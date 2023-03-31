@@ -14,6 +14,27 @@ import java.util.Set;
 public interface Move {
 
     /**
+     * Checks if this move is a pawn move or capture. (for fifty-move rule)
+     *
+     * @return {@code true} if this move is a pawn move or capture, otherwise {@code false}
+     */
+    boolean isPawnMoveOrCapture();
+
+    /**
+     * Gets the en passant target square created by this move.
+     *
+     * @return optional en passant target square
+     */
+    @NotNull Optional<Square> getEnPassantSquare();
+
+    /**
+     * Plays this move on a board.
+     *
+     * @param board game
+     */
+    void play(@NotNull Board board);
+
+    /**
      * Gets the string used to communicate this move over UCI.
      *
      * @return UCI LAN

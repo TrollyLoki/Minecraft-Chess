@@ -115,6 +115,21 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                         );
                         return true;
 
+                    } else if (args[1].equalsIgnoreCase("pgn")) {
+
+                        if (!games.containsKey(player.getUniqueId())) {
+                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
+                            return false;
+                        }
+                        Game game = games.get(player.getUniqueId());
+
+                        String pgn = game.toPGN();
+                        player.sendMessage(Component.text(pgn)
+                                .hoverEvent(Component.text("Click to copy", NamedTextColor.GRAY).asHoverEvent())
+                                .clickEvent(ClickEvent.copyToClipboard(pgn))
+                        );
+                        return true;
+
                     } else if (args[1].equalsIgnoreCase("board")) {
 
                         player.sendMessage(Component.text(board.toString()));
@@ -169,7 +184,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                         }
 
                         try {
-                            game.performMove(args[2]);
+                            game.performUciMove(args[2]);
                             return true;
                         } catch (IndexOutOfBoundsException e) {
                             player.sendMessage(Component.text("Invalid move: " + e.getMessage(), NamedTextColor.RED));
@@ -394,6 +409,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
             if (args.length == 2) {
 
                 options.add("fen");
+                options.add("pgn");
                 options.add("board");
                 options.add("game");
                 options.add("turn");
@@ -475,7 +491,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                 Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
                     try {
-                        game.performMove(move);
+                        game.performUciMove(move);
                         future.complete(move);
                     } catch (Exception e) {
                         e.printStackTrace();

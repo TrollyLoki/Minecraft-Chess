@@ -4,19 +4,21 @@ import net.trollyloki.mcchess.Color;
 import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
+import net.trollyloki.mcchess.game.move.Move;
 import net.trollyloki.mcchess.game.player.ChessPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnmodifiableView;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 public class Game {
@@ -96,6 +98,14 @@ public class Game {
         this.round = round;
     }
 
+    public @UnmodifiableView List<String> getMoves() {
+        return Collections.unmodifiableList(moves);
+    }
+
+    public @NotNull String getResult() {
+        return result;
+    }
+
     /**
      * Gets the color that moves next.
      *
@@ -114,87 +124,38 @@ public class Game {
         this.activeColor = activeColor;
     }
 
+    public void setCanShortCastle(@NotNull Color color, boolean canCastle) {
+        if (canCastle)
+            canShortCastle.add(color);
+        else
+            canShortCastle.remove(color);
+    }
+
+    public void setCanLongCastle(@NotNull Color color, boolean canCastle) {
+        if (canCastle)
+            canLongCastle.add(color);
+        else
+            canLongCastle.remove(color);
+    }
+
+    public void setEnPassantSquare(@Nullable Square enPassantSquare) {
+        this.enPassantSquare = enPassantSquare;
+    }
+
     /**
-     * Perform a move specified by UCI LAN.
+     * Performs a move.
      *
-     * @param move move LAN
-     * @return {@code true} if a piece was moved, otherwise {@code false}
+     * @param move move
      */
-    public boolean performMove(@NotNull String move) {
-        move = move.toLowerCase(Locale.ROOT);
+    public void performMove(@NotNull Move move) {
+        move.play(this.getBoard());
+        moves.add(move.toSAN());
 
-        // Parse string
+        validateCastling();
 
-        Square from = Square.fromString(move.substring(0, 2));
-        Square to = Square.fromString(move.substring(2, 4));
+        enPassantSquare = move.getEnPassantSquare().orElse(null);
 
-        Piece.Type promotionPiece = null;
-        if (move.length() > 4)
-            promotionPiece = Piece.Type.fromLetter(move.charAt(4));
-
-        // Find current pieces
-        Optional<Piece> pieceOptional = board.getPieceAt(from);
-        if (pieceOptional.isEmpty())
-            return false;
-        Piece piece = pieceOptional.get();
-        Optional<Piece> toPiece = board.getPieceAt(to);
-        boolean capturing = toPiece.isPresent();
-
-        // Move piece
-        if (!board.movePiece(from, to))
-            return false;
-
-        // Handle promotion
-        if (promotionPiece != null)
-            board.setPieceAt(to, new Piece(piece.getColor(), promotionPiece));
-
-        // Handle en passant
-
-        enPassantSquare = null;
-
-        if (piece.getType() == Piece.Type.PAWN) {
-
-            if (to.getFile() != from.getFile() && !capturing) {
-                capturing = true;
-
-                int pawnRank = to.getRank() + piece.getColor().opposite().getPawnDirection();
-                board.setPieceAt(new Square(to.getFile(), pawnRank), null);
-            }
-
-            if (Math.abs(to.getRank() - from.getRank()) == 2) {
-                enPassantSquare = new Square(to.getFile(), (from.getRank() + to.getRank()) / 2);
-            }
-
-        }
-
-        // Handle castling
-
-        if (piece.getType() == Piece.Type.KING) {
-            if (move.startsWith("e1g1")) // white short castling
-                board.movePiece(new Square(7, 0), new Square(5, 0));
-            else if (move.startsWith("e1c1")) // white long castling
-                board.movePiece(new Square(0, 0), new Square(3, 0));
-            else if (move.startsWith("e8g8")) // black short castling
-                board.movePiece(new Square(7, 7), new Square(5, 7));
-            else if (move.startsWith("e8c8")) // black long castling
-                board.movePiece(new Square(0, 7), new Square(3, 7));
-
-            canShortCastle.remove(piece.getColor());
-            canLongCastle.remove(piece.getColor());
-        }
-
-        if (piece.getType() == Piece.Type.ROOK && from.getRank() == piece.getColor().getBackRank()) {
-
-            if (from.getFile() == 0)
-                canLongCastle.remove(piece.getColor());
-            else if (from.getFile() == 7)
-                canShortCastle.remove(piece.getColor());
-
-        }
-
-        // Update move info
-
-        if (capturing || piece.getType() == Piece.Type.PAWN)
+        if (move.isPawnMoveOrCapture())
             halfMoves = 0;
         else
             halfMoves++;
@@ -202,19 +163,42 @@ public class Game {
         activeColor = activeColor.opposite();
         if (activeColor == Color.WHITE)
             moveNumber++;
+    }
 
-        return true;
+    /**
+     * Performs a move specified by UCI LAN.
+     *
+     * @param uciMove UCI LAN
+     */
+    public void performUciMove(@NotNull String uciMove) {
+        performMove(Move.fromUCI(uciMove, board));
+    }
+
+    /**
+     * Performs a move specified by SAN.
+     *
+     * @param san SAN
+     */
+    public void performSanMove(@NotNull String san) {
+        performMove(Move.fromSAN(san, this));
     }
 
     public void validateCastling() {
         for (Color color : Color.values()) {
             if (canShortCastle.contains(color) || canLongCastle.contains(color)) {
                 int backRank = color.getBackRank();
-                boolean kingValid = board.isPieceAt(new Square(4, backRank), new Piece(color, Piece.Type.KING));
-                if (!kingValid || !board.isPieceAt(new Square(7, backRank), new Piece(color, Piece.Type.ROOK)))
+
+                if (!board.isPieceAt(new Square(4, backRank), new Piece(color, Piece.Type.KING))) {
                     canShortCastle.remove(color);
-                if (!kingValid || !board.isPieceAt(new Square(0, backRank), new Piece(color, Piece.Type.ROOK)))
                     canLongCastle.remove(color);
+                    continue;
+                }
+
+                if (canShortCastle.contains(color) && !board.isPieceAt(new Square(7, backRank), new Piece(color, Piece.Type.ROOK)))
+                    canShortCastle.remove(color);
+                if (canLongCastle.contains(color) && !board.isPieceAt(new Square(0, backRank), new Piece(color, Piece.Type.ROOK)))
+                    canLongCastle.remove(color);
+
             }
         }
     }
