@@ -136,6 +136,7 @@ public interface Board {
         if (fromPiece.isEmpty())
             return false;
 
+        setPieceAt(from, null);
         setPieceAt(to, fromPiece.get());
         return true;
     }
