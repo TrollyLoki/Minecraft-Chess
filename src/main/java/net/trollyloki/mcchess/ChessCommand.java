@@ -6,6 +6,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.board.PhysicalBoard;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.game.Game;
 import org.bukkit.Bukkit;
@@ -74,7 +75,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                     Vector rankDirection = attachmentFace.getDirection().crossProduct(fileDirection);
                     Location cornerLocation = player.getLocation().getBlock().getRelative(attachmentFace).getLocation();
 
-                    Board board = new Board(cornerLocation, attachmentFace, rankDirection, fileDirection);
+                    Board board = new PhysicalBoard(cornerLocation, attachmentFace, rankDirection, fileDirection);
                     boards.put(player.getUniqueId(), board);
                     player.sendMessage(Component.text("Board registered", NamedTextColor.GREEN));
                     return true;

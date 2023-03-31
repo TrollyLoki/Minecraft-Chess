@@ -5,8 +5,6 @@ import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
 import net.trollyloki.mcchess.game.player.ChessPlayer;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -132,15 +130,7 @@ public class Game {
                 capturing = true;
 
                 int pawnRank = to.getRank() + piece.getColor().opposite().getPawnDirection();
-
-                board.getItemFrameFor(new Square(to.getFile(), pawnRank)).ifPresent(frame -> {
-                    ItemStack existingItem = frame.getItem();
-                    if (existingItem.getType() != Material.AIR) {
-                        frame.setItem(null);
-                        frame.getWorld().dropItem(frame.getLocation(), existingItem);
-                    }
-                });
-
+                board.setPieceAt(new Square(to.getFile(), pawnRank), null);
             }
 
             if (Math.abs(to.getRank() - from.getRank()) == 2) {
