@@ -4,6 +4,8 @@ import net.trollyloki.mcchess.game.Game;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.concurrent.CompletableFuture;
+
 public class HumanPlayer implements ChessPlayer {
 
     private final @NotNull Player player;
@@ -23,8 +25,8 @@ public class HumanPlayer implements ChessPlayer {
     }
 
     @Override
-    public boolean play(@NotNull Game game) {
-        return false;
+    public @NotNull CompletableFuture<Boolean> play(@NotNull Game game) {
+        return CompletableFuture.completedFuture(false);
     }
 
 }

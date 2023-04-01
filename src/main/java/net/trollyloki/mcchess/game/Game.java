@@ -19,7 +19,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public class Game {
 
@@ -35,10 +37,10 @@ public class Game {
     private @NotNull LocalDateTime startTime = LocalDateTime.now();
     private int round = 1;
 
+    private final @NotNull Map<Color, ChessPlayer> players = new HashMap<>();
+
     private final @NotNull List<String> moves = new LinkedList<>();
     private @NotNull String result = "*";
-
-    private final @NotNull Map<Color, ChessPlayer> players = new HashMap<>();
 
     private @NotNull Color activeColor;
     private final @NotNull Set<Color> canShortCastle, canLongCastle;
@@ -98,6 +100,14 @@ public class Game {
         this.round = round;
     }
 
+    public @NotNull Optional<ChessPlayer> getPlayer(@NotNull Color color) {
+        return Optional.ofNullable(players.get(color));
+    }
+
+    public void setPlayer(@NotNull Color color, @NotNull ChessPlayer player) {
+        players.put(color, player);
+    }
+
     public @UnmodifiableView List<String> getMoves() {
         return Collections.unmodifiableList(moves);
     }
@@ -140,6 +150,11 @@ public class Game {
 
     public void setEnPassantSquare(@Nullable Square enPassantSquare) {
         this.enPassantSquare = enPassantSquare;
+    }
+
+    public @NotNull CompletableFuture<Boolean> play() {
+        return getPlayer(getActiveColor()).map(player -> player.play(this))
+                .orElseGet(() -> CompletableFuture.completedFuture(false));
     }
 
     /**

@@ -4,11 +4,14 @@ import net.andreinc.neatchess.client.UCI;
 import net.andreinc.neatchess.client.UCIResponse;
 import net.andreinc.neatchess.client.model.BestMove;
 import net.andreinc.neatchess.client.model.EngineInfo;
+import net.trollyloki.mcchess.ChessPlugin;
 import net.trollyloki.mcchess.game.Game;
+import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
+import java.util.concurrent.CompletableFuture;
 
 public class EnginePlayer implements ChessPlayer, AutoCloseable {
 
@@ -126,19 +129,34 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
     }
 
     @Override
-    public boolean play(@NotNull Game game) {
-        if (!lastGame.refersTo(game)) {
-            engine.uciNewGame();
-            lastGame = new WeakReference<>(game);
-        }
-        engine.positionFen(game.toFEN());
+    public @NotNull CompletableFuture<Boolean> play(@NotNull Game game) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+            try {
 
-        BestMove bestMove = bestMove().getResult();
-        if (bestMove != null) {
-            game.performUciMove(bestMove.getCurrent());
-            return true;
-        }
-        return false;
+                if (!lastGame.refersTo(game)) {
+                    engine.uciNewGame();
+                    lastGame = new WeakReference<>(game);
+                }
+                engine.positionFen(game.toFEN());
+
+                String bestMove = bestMove().getResultOrThrow().getCurrent();
+                Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
+                    try {
+
+                        game.performUciMove(bestMove);
+                        future.complete(true);
+
+                    } catch (Exception e) {
+                        future.completeExceptionally(e);
+                    }
+                });
+
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
     }
 
     /**
