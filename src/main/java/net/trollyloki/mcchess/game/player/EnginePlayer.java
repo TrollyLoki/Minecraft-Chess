@@ -131,30 +131,35 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
     @Override
     public @NotNull CompletableFuture<Boolean> play(@NotNull Game game) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
-        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
-            try {
+        Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
+            String fen = game.toFEN();
 
-                if (!lastGame.refersTo(game)) {
-                    engine.uciNewGame();
-                    lastGame = new WeakReference<>(game);
-                }
-                engine.positionFen(game.toFEN());
+            Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+                try {
 
-                String bestMove = bestMove().getResultOrThrow().getCurrent();
-                Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
-                    try {
-
-                        game.performUciMove(bestMove);
-                        future.complete(true);
-
-                    } catch (Exception e) {
-                        future.completeExceptionally(e);
+                    if (!lastGame.refersTo(game)) {
+                        engine.uciNewGame();
+                        lastGame = new WeakReference<>(game);
                     }
-                });
+                    engine.positionFen(fen);
 
-            } catch (Exception e) {
-                future.completeExceptionally(e);
-            }
+                    String bestMove = bestMove().getResultOrThrow().getCurrent();
+                    Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
+                        try {
+
+                            game.performUciMove(bestMove);
+                            future.complete(true);
+
+                        } catch (Exception e) {
+                            future.completeExceptionally(e);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
+                }
+            });
+
         });
         return future;
     }
@@ -178,6 +183,15 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
 
         engine.close();
         closed = true;
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            close();
+        } finally {
+            super.finalize();
+        }
     }
 
 }

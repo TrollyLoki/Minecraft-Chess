@@ -1,6 +1,5 @@
 package net.trollyloki.mcchess;
 
-import net.andreinc.neatchess.client.UCI;
 import net.andreinc.neatchess.client.exception.UCIRuntimeException;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -9,6 +8,7 @@ import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.PhysicalBoard;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.game.Game;
+import net.trollyloki.mcchess.game.player.EnginePlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.BlockFace;
@@ -17,31 +17,32 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
+import java.util.concurrent.ExecutionException;
 
-public class ChessCommand implements CommandExecutor, TabCompleter {
+public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
     public static final String ADMIN_PERMISSION = "chess.admin";
 
     private final Map<UUID, Board> boards = new HashMap<>();
     private final Map<UUID, Game> games = new HashMap<>();
-    private final Map<UUID, UCI> engines = new HashMap<>();
-    private final Map<UUID, CompletableFuture<?>> tasks = new HashMap<>();
-    private final Set<UUID> cancelling = new HashSet<>();
+    private final Map<UUID, EnginePlayer> engines = new HashMap<>();
+    private final Map<UUID, BukkitRunnable> tasks = new HashMap<>();
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
@@ -242,21 +243,19 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             return false;
                         }
 
-                        try {
+                        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+                            try {
 
-                            UCI engine = new UCI();
-                            engines.put(player.getUniqueId(), engine);
-                            engine.start(ChessPlugin.engine());
-                            sender.sendMessage(Component.text("Started engine", NamedTextColor.GREEN));
-                            return true;
+                                engines.put(player.getUniqueId(), new EnginePlayer(ChessPlugin.engine()));
+                                sender.sendMessage(Component.text("Started engine", NamedTextColor.GREEN));
 
-                        } catch (UCIRuntimeException e) {
-                            e.printStackTrace();
-                            engines.remove(player.getUniqueId());
+                            } catch (UCIRuntimeException e) {
+                                e.printStackTrace();
 
-                            sender.sendMessage(Component.text("Failed to start engine!", NamedTextColor.RED));
-                            return false;
-                        }
+                                sender.sendMessage(Component.text("Failed to start engine!", NamedTextColor.RED));
+                            }
+                        });
+                        return true;
 
                     } else if (args[1].equalsIgnoreCase("move")) {
 
@@ -264,14 +263,14 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
                             return false;
                         }
-                        UCI engine = engines.get(player.getUniqueId());
+                        EnginePlayer engine = engines.get(player.getUniqueId());
 
                         if (args.length == 2) {
                             sender.sendMessage(Component.text("Usage: /" + label + " engine move <ms>", NamedTextColor.RED));
                             return false;
                         }
 
-                        if (tasks.containsKey(player.getUniqueId()) && !tasks.get(player.getUniqueId()).isDone()) {
+                        if (tasks.containsKey(player.getUniqueId())) {
                             sender.sendMessage(Component.text("Please wait for your current action to complete", NamedTextColor.RED));
                             return false;
                         }
@@ -281,13 +280,20 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             long moveTime = Long.parseLong(args[2]);
 
                             player.sendMessage(Component.text("Moving...", NamedTextColor.YELLOW));
-                            tasks.put(player.getUniqueId(), engineMove(game, engine, moveTime).whenComplete((m, e) -> {
-                                if (e != null)
-                                    player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
-                                else
-                                    player.sendMessage(Component.text("Engine played " + m, NamedTextColor.GREEN));
-                            }));
+                            engine.setMoveTime(moveTime);
 
+                            tasks.put(player.getUniqueId(), null);
+                            engine.play(game).whenComplete((moved, exception) -> {
+                                tasks.remove(player.getUniqueId());
+                                if (exception != null) {
+                                    player.sendMessage(Component.text("Failed to move: " + exception, NamedTextColor.RED));
+                                } else {
+                                    if (moved)
+                                        player.sendMessage(Component.text("Engine made a move", NamedTextColor.GREEN));
+                                    else
+                                        player.sendMessage(Component.text("Engine did not make a move", NamedTextColor.RED));
+                                }
+                            });
                             return true;
 
                         } catch (NumberFormatException e) {
@@ -301,14 +307,14 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
                             return false;
                         }
-                        UCI engine = engines.get(player.getUniqueId());
+                        EnginePlayer engine = engines.get(player.getUniqueId());
 
                         if (args.length == 2) {
                             sender.sendMessage(Component.text("Usage: /" + label + " engine play <ms>", NamedTextColor.RED));
                             return false;
                         }
 
-                        if (tasks.containsKey(player.getUniqueId()) && !tasks.get(player.getUniqueId()).isDone()) {
+                        if (tasks.containsKey(player.getUniqueId())) {
                             sender.sendMessage(Component.text("Please wait for your current action to complete", NamedTextColor.RED));
                             return false;
                         }
@@ -318,16 +324,42 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             long moveTime = Long.parseLong(args[2]);
 
                             player.sendMessage(Component.text("Playing...", NamedTextColor.YELLOW));
-                            cancelling.remove(player.getUniqueId());
+                            engine.setMoveTime(moveTime);
+                            game.setPlayer(Color.WHITE, engine);
+                            game.setPlayer(Color.BLACK, engine);
 
-                            Supplier<CompletableFuture<?>> supplier = () -> engineMove(game, engine, moveTime).whenComplete((m, e) -> {
-                                if (e != null)
-                                    player.sendMessage(Component.text("Error: " + e.getMessage(), NamedTextColor.RED));
-                                else {
-                                    player.sendMessage(Component.text("Engine played " + m, NamedTextColor.GREEN));
+                            BukkitRunnable runnable = new BukkitRunnable() {
+                                private boolean cancel = false;
+
+                                @Override
+                                public void run() {
+                                    try {
+
+                                        while (!cancel) {
+                                            if (!game.play().get()) {
+                                                player.sendMessage(Component.text(game.getActiveColor() + " did not make a move!", NamedTextColor.RED));
+                                                break;
+                                            }
+                                        }
+
+                                    } catch (ExecutionException e) {
+
+                                        player.sendMessage(Component.text(game.getActiveColor() + " failed to move: " + e, NamedTextColor.RED));
+
+                                    } catch (InterruptedException e) {
+                                        e.printStackTrace();
+                                    }
+                                    tasks.remove(player.getUniqueId());
                                 }
-                            });
-                            playLoopHelper(player.getUniqueId(), supplier);
+
+                                @Override
+                                public synchronized void cancel() throws IllegalStateException {
+                                    super.cancel();
+                                    cancel = true;
+                                }
+                            };
+                            tasks.put(player.getUniqueId(), runnable);
+                            runnable.runTaskAsynchronously(ChessPlugin.getInstance());
                             return true;
 
                         } catch (NumberFormatException e) {
@@ -337,9 +369,15 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
 
                     } else if (args[1].equalsIgnoreCase("cancel")) {
 
-                        cancelling.add(player.getUniqueId());
-                        sender.sendMessage(Component.text("Cancelling...", NamedTextColor.YELLOW));
-                        return true;
+                        BukkitRunnable runnable = tasks.get(player.getUniqueId());
+                        if (runnable != null) {
+                            runnable.cancel();
+                            sender.sendMessage(Component.text("Cancelling...", NamedTextColor.YELLOW));
+                            return true;
+                        } else {
+                            sender.sendMessage(Component.text("Nothing to cancel", NamedTextColor.RED));
+                            return false;
+                        }
 
                     } else if (args[1].equalsIgnoreCase("stop")) {
 
@@ -347,12 +385,10 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
                             player.sendMessage(Component.text("You have not started an engine", NamedTextColor.RED));
                             return false;
                         }
-                        UCI engine = engines.get(player.getUniqueId());
 
                         try {
 
-                            engine.close();
-                            engines.remove(player.getUniqueId());
+                            engines.remove(player.getUniqueId()).close();
                             sender.sendMessage(Component.text("Stopped engine", NamedTextColor.GREEN));
                             return true;
 
@@ -472,39 +508,14 @@ public class ChessCommand implements CommandExecutor, TabCompleter {
         return options;
     }
 
-    private void playLoopHelper(@NotNull UUID key, @NotNull Supplier<CompletableFuture<?>> futureSupplier) {
-        tasks.put(key, futureSupplier.get().thenRun(() -> {
-            if (!cancelling.contains(key))
-                playLoopHelper(key, futureSupplier);
-        }));
-    }
-
-    public static @NotNull CompletableFuture<String> engineMove(@NotNull Game game, @NotNull UCI engine, long moveTime) {
-        String fen = game.toFEN();
-
-        CompletableFuture<String> future = new CompletableFuture<>();
-        Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
-            try {
-
-                engine.positionFen(fen).getResultOrThrow();
-                String move = engine.bestMove(moveTime).getResultOrThrow().getCurrent();
-
-                Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
-                    try {
-                        game.performUciMove(move);
-                        future.complete(move);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        future.completeExceptionally(e);
-                    }
-                });
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(@NotNull PlayerQuitEvent event) {
+        BukkitRunnable runnable = tasks.remove(event.getPlayer().getUniqueId());
+        if (runnable != null)
+            runnable.cancel();
+        EnginePlayer engine = engines.remove(event.getPlayer().getUniqueId());
+        if (engine != null)
+            engine.close();
     }
 
 }
