@@ -5,6 +5,7 @@ import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
 import net.trollyloki.mcchess.game.Game;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
@@ -47,6 +48,41 @@ public interface Move {
      * @return SAN
      */
     @NotNull String toSAN();
+
+    @Contract("_, _, _, _ -> new")
+    static @NotNull Move normal(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to, boolean capture) {
+        return new NormalMove(pieceType, from, to, capture);
+    }
+
+    @Contract("_, _, _ -> new")
+    static @NotNull Move normal(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to) {
+        return new NormalMove(pieceType, from, to, false);
+    }
+
+    @Contract("_, _, _, _, _ -> new")
+    static @NotNull Move promotion(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType, boolean capture) {
+        return new PromotionMove(pieceType, from, to, capture, promotionType);
+    }
+
+    @Contract("_, _, _, _ -> new")
+    static @NotNull Move promotion(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType) {
+        return new PromotionMove(pieceType, from, to, false, promotionType);
+    }
+
+    @Contract("_ -> new")
+    static @NotNull Move shortCastle(@NotNull Color color) {
+        return new CastleMove(color, false);
+    }
+
+    @Contract("_ -> new")
+    static @NotNull Move longCastle(@NotNull Color color) {
+        return new CastleMove(color, true);
+    }
+
+    @Contract("_ -> new")
+    default @NotNull Move check(@NotNull CheckStatus checkStatus) {
+        return new CheckMove(this, checkStatus);
+    }
 
     /**
      * Parses a move from UCI LAN in the context of a board.

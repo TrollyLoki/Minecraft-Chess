@@ -17,6 +17,11 @@ public class CheckMove implements Move {
     }
 
     @Override
+    public @NotNull Move check(@NotNull CheckStatus checkStatus) {
+        return new CheckMove(move, checkStatus);
+    }
+
+    @Override
     public boolean isPawnMoveOrCapture() {
         return move.isPawnMoveOrCapture();
     }
