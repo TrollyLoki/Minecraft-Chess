@@ -1,5 +1,6 @@
 package net.trollyloki.mcchess.game.player;
 
+import net.kyori.adventure.text.Component;
 import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.game.move.Move;
 import org.bukkit.entity.Player;
@@ -28,6 +29,12 @@ public class HumanPlayer implements ChessPlayer {
     @Override
     public @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board) {
         return CompletableFuture.failedFuture(new UnsupportedOperationException());
+    }
+
+    @Override
+    public @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board, @NotNull Move opponentMove) {
+        player.sendMessage(Component.text("Opponent played " + opponentMove));
+        return chooseMove(board);
     }
 
 }

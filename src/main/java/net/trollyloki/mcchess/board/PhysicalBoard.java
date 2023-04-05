@@ -3,6 +3,7 @@ package net.trollyloki.mcchess.board;
 import net.trollyloki.mcchess.ChessPlugin;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.ItemFrame;
@@ -41,6 +42,15 @@ public class PhysicalBoard extends Board {
         this.fileDirection = fileDirection.clone().normalize();
 
         validateCastling();
+    }
+
+    /**
+     * Gets the world this board is in.
+     *
+     * @return world
+     */
+    public @NotNull World getWorld() {
+        return cornerLocation.getWorld();
     }
 
     /**

@@ -121,7 +121,17 @@ public class Game {
 
     public void playMove(@NotNull Move move) {
         board.performMove(move);
+        postMove(move);
+    }
+
+    /**
+     * Updates the state of this game assuming a given move has been made.
+     *
+     * @param move move
+     */
+    public void postMove(@NotNull Move move) {
         moves.add(move);
+        getPlayer(board.getActiveColor()).ifPresent(player -> player.chooseMove(board, move));
     }
 
     private static final @NotNull DateTimeFormatter

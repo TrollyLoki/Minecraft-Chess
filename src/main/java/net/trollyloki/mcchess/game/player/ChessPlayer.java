@@ -23,4 +23,15 @@ public interface ChessPlayer {
      */
     @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board);
 
+    /**
+     * Chooses a move to play on a board.
+     *
+     * @param board board
+     * @param opponentMove most recent move made by the opponent
+     * @return future to completed with the chosen move
+     */
+    default @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board, @NotNull Move opponentMove) {
+        return chooseMove(board);
+    }
+
 }
