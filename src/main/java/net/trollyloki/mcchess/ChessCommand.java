@@ -193,6 +193,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
                     } else if (args[1].equalsIgnoreCase("newgame")) {
 
+                        board.loadFEN(Board.STANDARD_FEN);
                         games.put(player.getUniqueId(), new Game(board));
                         player.sendMessage(Component.text("New game started", NamedTextColor.GREEN));
                         return true;
