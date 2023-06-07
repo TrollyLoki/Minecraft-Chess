@@ -8,6 +8,7 @@ import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.PhysicalBoard;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.game.Game;
+import net.trollyloki.mcchess.game.move.Move;
 import net.trollyloki.mcchess.game.player.EnginePlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -103,13 +104,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
                     if (args[1].equalsIgnoreCase("fen")) {
 
-                        if (!games.containsKey(player.getUniqueId())) {
-                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
-                            return false;
-                        }
-                        Game game = games.get(player.getUniqueId());
-
-                        String fen = game.toFEN();
+                        String fen = board.toFEN();
                         player.sendMessage(Component.text(fen)
                                 .hoverEvent(Component.text("Click to copy", NamedTextColor.GRAY).asHoverEvent())
                                 .clickEvent(ClickEvent.copyToClipboard(fen))
@@ -149,12 +144,6 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
                     } else if (args[1].equalsIgnoreCase("turn")) {
 
-                        if (!games.containsKey(player.getUniqueId())) {
-                            player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
-                            return false;
-                        }
-                        Game game = games.get(player.getUniqueId());
-
                         if (args.length == 2) {
                             sender.sendMessage(Component.text("Usage: /" + label + " debug turn <white|black>", NamedTextColor.RED));
                             return false;
@@ -162,8 +151,8 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
                         try {
 
-                            game.setActiveColor(Color.valueOf(args[2].toUpperCase(Locale.ROOT)));
-                            player.sendMessage(Component.text("Active color set to " + game.getActiveColor(), NamedTextColor.GREEN));
+                            board.setActiveColor(Color.valueOf(args[2].toUpperCase(Locale.ROOT)));
+                            player.sendMessage(Component.text("Active color set to " + board.getActiveColor(), NamedTextColor.GREEN));
                             return true;
 
                         } catch (IllegalArgumentException e) {
@@ -171,7 +160,7 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
                             return false;
                         }
 
-                    } else if (args[1].equalsIgnoreCase("move")) {
+                    } else if (args[1].equalsIgnoreCase("move") || args[1].equalsIgnoreCase("legal")) {
 
                         if (!games.containsKey(player.getUniqueId())) {
                             player.sendMessage(Component.text("You have not started a game", NamedTextColor.RED));
@@ -180,12 +169,22 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
                         Game game = games.get(player.getUniqueId());
 
                         if (args.length == 2) {
-                            sender.sendMessage(Component.text("Usage: /" + label + " debug move <move>", NamedTextColor.RED));
+                            sender.sendMessage(Component.text("Usage: /" + label + " debug " + args[1] + " <move>", NamedTextColor.RED));
                             return false;
                         }
 
                         try {
-                            game.performUciMove(args[2]);
+                            Move move = Move.fromUCI(args[2], game.getBoard());
+
+                            if (args[1].equalsIgnoreCase("move")) {
+                                game.playMove(move);
+                            } else {
+                                if (board.isLegalMove(move))
+                                    player.sendMessage(Component.text(move.toSAN() + " is a legal move", NamedTextColor.GREEN));
+                                else
+                                    player.sendMessage(Component.text(move.toSAN() + " is not a legal move", NamedTextColor.RED));
+                            }
+
                             return true;
                         } catch (IndexOutOfBoundsException e) {
                             player.sendMessage(Component.text("Invalid move: " + e.getMessage(), NamedTextColor.RED));
@@ -206,7 +205,8 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
                         }
 
                         try {
-                            games.put(player.getUniqueId(), Game.fromFEN(String.join(" ", Arrays.copyOfRange(args, 2, 8)), board));
+                            board.loadFEN(String.join(" ", Arrays.copyOfRange(args, 2, 8)));
+                            games.put(player.getUniqueId(), new Game(board));
                             player.sendMessage(Component.text("Game loaded from FEN", NamedTextColor.GREEN));
                             return true;
                         } catch (Exception e) {
@@ -283,16 +283,12 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
                             engine.setMoveTime(moveTime);
 
                             tasks.put(player.getUniqueId(), null);
-                            engine.play(game).whenComplete((moved, exception) -> {
+                            game.play(engine).whenComplete((move, exception) -> {
                                 tasks.remove(player.getUniqueId());
-                                if (exception != null) {
+                                if (exception != null)
                                     player.sendMessage(Component.text("Failed to move: " + exception, NamedTextColor.RED));
-                                } else {
-                                    if (moved)
-                                        player.sendMessage(Component.text("Engine made a move", NamedTextColor.GREEN));
-                                    else
-                                        player.sendMessage(Component.text("Engine did not make a move", NamedTextColor.RED));
-                                }
+                                else
+                                    player.sendMessage(Component.text("Engine played " + move.toSAN(), NamedTextColor.GREEN));
                             });
                             return true;
 
@@ -337,16 +333,16 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
 
                                         while (!cancel) {
                                             if (!game.play().get()) {
-                                                player.sendMessage(Component.text(game.getActiveColor() + " did not make a move!", NamedTextColor.RED));
+                                                player.sendMessage(Component.text(game.getBoard().getActiveColor() + " did not make a move!", NamedTextColor.RED));
                                                 break;
                                             }
                                         }
 
                                     } catch (ExecutionException e) {
 
-                                        player.sendMessage(Component.text(game.getActiveColor() + " failed to move: " + e, NamedTextColor.RED));
+                                        player.sendMessage(Component.text(game.getBoard().getActiveColor() + " failed to move: " + e, NamedTextColor.RED));
 
-                                    } catch (InterruptedException e) {
+                                    } catch (Exception e) {
                                         e.printStackTrace();
                                     }
                                     tasks.remove(player.getUniqueId());
@@ -450,10 +446,11 @@ public class ChessCommand implements CommandExecutor, TabCompleter, Listener {
                 options.add("game");
                 options.add("turn");
                 options.add("move");
+                options.add("legal");
                 options.add("newgame");
                 options.add("load");
 
-            } else if (args[1].equalsIgnoreCase("move")) {
+            } else if (args[1].equalsIgnoreCase("move") || args[1].equalsIgnoreCase("legal")) {
 
                 if (args.length == 3) {
 

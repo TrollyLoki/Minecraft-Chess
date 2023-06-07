@@ -50,6 +50,11 @@ public class NormalMove implements Move {
     }
 
     @Override
+    public boolean isPossible(@NotNull Board board) {
+        return board.isMovePossible(from, to);
+    }
+
+    @Override
     public void play(@NotNull Board board) {
         board.movePiece(from, to);
         if (pieceType == Piece.Type.PAWN && capture && board.getPieceAt(to).isEmpty())

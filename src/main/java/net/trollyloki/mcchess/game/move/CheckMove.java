@@ -32,6 +32,11 @@ public class CheckMove implements Move {
     }
 
     @Override
+    public boolean isPossible(@NotNull Board board) {
+        return move.isPossible(board);
+    }
+
+    @Override
     public void play(@NotNull Board board) {
         move.play(board);
     }

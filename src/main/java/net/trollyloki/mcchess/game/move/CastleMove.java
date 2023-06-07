@@ -2,6 +2,7 @@ package net.trollyloki.mcchess.game.move;
 
 import net.trollyloki.mcchess.Color;
 import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,6 +26,14 @@ public class CastleMove implements Move {
         return queenside;
     }
 
+    private @NotNull Square getKingSquare() {
+        return new Square(4, color.getBackRank());
+    }
+
+    private @NotNull Square getRookSquare() {
+        return new Square(queenside ? 0 : 7, color.getBackRank());
+    }
+
     @Override
     public boolean isPawnMoveOrCapture() {
         return false;
@@ -36,15 +45,26 @@ public class CastleMove implements Move {
     }
 
     @Override
+    public boolean isPossible(@NotNull Board board) {
+        if (queenside ? !board.canLongCastle(color) : !board.canShortCastle(color))
+            return false;
+
+        Square kingSquare = getKingSquare();
+        Square rookSquare = getRookSquare();
+
+        return board.isPieceAt(kingSquare, new Piece(color, Piece.Type.KING))
+                && board.isPieceAt(rookSquare, new Piece(color, Piece.Type.ROOK))
+                && board.isRankOpen(color.getBackRank(), rookSquare.getFile(), kingSquare.getFile());
+    }
+
+    @Override
     public void play(@NotNull Board board) {
-        int rank = color.getBackRank();
-        if (queenside) {
-            board.movePiece(new Square(4, rank), new Square(2, rank)); // king
-            board.movePiece(new Square(0, rank), new Square(3, rank)); // rook
-        } else {
-            board.movePiece(new Square(4, rank), new Square(6, rank)); // king
-            board.movePiece(new Square(7, rank), new Square(5, rank)); // rook
-        }
+        Square kingSquare = getKingSquare();
+        Square rookSquare = getRookSquare();
+        int direction = queenside ? -1 : 1;
+
+        board.movePiece(kingSquare, kingSquare.relative(2 * direction, 0));
+        board.movePiece(rookSquare, kingSquare.relative(direction, 0));
     }
 
     @Override

@@ -1,6 +1,7 @@
 package net.trollyloki.mcchess.game.player;
 
-import net.trollyloki.mcchess.game.Game;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.game.move.Move;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,8 +26,8 @@ public class HumanPlayer implements ChessPlayer {
     }
 
     @Override
-    public @NotNull CompletableFuture<Boolean> play(@NotNull Game game) {
-        return CompletableFuture.completedFuture(false);
+    public @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board) {
+        return CompletableFuture.failedFuture(new UnsupportedOperationException());
     }
 
 }

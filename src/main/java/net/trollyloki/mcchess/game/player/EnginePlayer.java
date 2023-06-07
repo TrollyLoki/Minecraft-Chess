@@ -5,7 +5,8 @@ import net.andreinc.neatchess.client.UCIResponse;
 import net.andreinc.neatchess.client.model.BestMove;
 import net.andreinc.neatchess.client.model.EngineInfo;
 import net.trollyloki.mcchess.ChessPlugin;
-import net.trollyloki.mcchess.game.Game;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.game.move.Move;
 import org.bukkit.Bukkit;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,7 +24,7 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
 
     private int depth = 0;
     private long moveTime = 0;
-    private @NotNull Reference<Game> lastGame = new WeakReference<>(null);
+    private @NotNull Reference<Board> lastBoard = new WeakReference<>(null);
 
     /**
      * Creates a new engine player.
@@ -129,37 +130,42 @@ public class EnginePlayer implements ChessPlayer, AutoCloseable {
     }
 
     @Override
-    public @NotNull CompletableFuture<Boolean> play(@NotNull Game game) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
+    public @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board) {
+        CompletableFuture<Move> future = new CompletableFuture<>();
         Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
-            String fen = game.toFEN();
+            try {
 
-            Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
-                try {
+                String fen = board.toFEN();
 
-                    if (!lastGame.refersTo(game)) {
-                        engine.uciNewGame();
-                        lastGame = new WeakReference<>(game);
-                    }
-                    engine.positionFen(fen);
+                Bukkit.getScheduler().runTaskAsynchronously(ChessPlugin.getInstance(), () -> {
+                    try {
 
-                    String bestMove = bestMove().getResultOrThrow().getCurrent();
-                    Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
-                        try {
-
-                            game.performUciMove(bestMove);
-                            future.complete(true);
-
-                        } catch (Exception e) {
-                            future.completeExceptionally(e);
+                        if (!lastBoard.refersTo(board)) {
+                            engine.uciNewGame();
+                            lastBoard = new WeakReference<>(board);
                         }
-                    });
+                        engine.positionFen(fen);
 
-                } catch (Exception e) {
-                    future.completeExceptionally(e);
-                }
-            });
+                        String bestMove = bestMove().getResultOrThrow().getCurrent();
 
+                        Bukkit.getScheduler().runTask(ChessPlugin.getInstance(), () -> {
+                            try {
+
+                                future.complete(Move.fromUCI(bestMove, board));
+
+                            } catch (Exception e) {
+                                future.completeExceptionally(e);
+                            }
+                        });
+
+                    } catch (Exception e) {
+                        future.completeExceptionally(e);
+                    }
+                });
+
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
         });
         return future;
     }

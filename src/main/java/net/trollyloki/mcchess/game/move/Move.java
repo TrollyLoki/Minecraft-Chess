@@ -4,7 +4,6 @@ import net.trollyloki.mcchess.Color;
 import net.trollyloki.mcchess.board.Board;
 import net.trollyloki.mcchess.board.Piece;
 import net.trollyloki.mcchess.board.Square;
-import net.trollyloki.mcchess.game.Game;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -27,6 +26,14 @@ public interface Move {
      * @return optional en passant target square
      */
     @NotNull Optional<Square> getEnPassantSquare();
+
+    /**
+     * Checks if it is possible to play this move on a certain board. This method does <strong>not</strong> take checks into account.
+     *
+     * @param board board
+     * @return {@code true} if the move is possible, otherwise {@code false}
+     */
+    boolean isPossible(@NotNull Board board);
 
     /**
      * Plays this move on a board.
@@ -59,14 +66,14 @@ public interface Move {
         return new NormalMove(pieceType, from, to, false);
     }
 
-    @Contract("_, _, _, _, _ -> new")
-    static @NotNull Move promotion(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType, boolean capture) {
-        return new PromotionMove(pieceType, from, to, capture, promotionType);
+    @Contract("_, _, _, _ -> new")
+    static @NotNull Move promotion(@NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType, boolean capture) {
+        return new PromotionMove(from, to, capture, promotionType);
     }
 
-    @Contract("_, _, _, _ -> new")
-    static @NotNull Move promotion(@NotNull Piece.Type pieceType, @NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType) {
-        return new PromotionMove(pieceType, from, to, false, promotionType);
+    @Contract("_, _, _ -> new")
+    static @NotNull Move promotion(@NotNull Square from, @NotNull Square to, @NotNull Piece.Type promotionType) {
+        return new PromotionMove(from, to, false, promotionType);
     }
 
     @Contract("_ -> new")
@@ -115,25 +122,25 @@ public interface Move {
                 || pieceType == Piece.Type.PAWN && from.getFile() != to.getFile();
 
         if (uciMove.length() > 4)
-            return new PromotionMove(pieceType, from, to, capture, Piece.Type.fromLetter(uciMove.charAt(4)));
+            return new PromotionMove(from, to, capture, Piece.Type.fromLetter(uciMove.charAt(4)));
         else
             return new NormalMove(pieceType, from, to, capture);
     }
 
     /**
-     * Parses a move from SAN in the context of a game.
+     * Parses a move from SAN in the context of a board.
      *
-     * @param san  SAN
-     * @param game game, for context
+     * @param san   SAN
+     * @param board board, for context
      * @return move
      */
-    static @NotNull Move fromSAN(@NotNull String san, @NotNull Game game) {
+    static @NotNull Move fromSAN(@NotNull String san, @NotNull Board board) {
         switch (san) {
             case "O-O" -> {
-                return new CastleMove(game.getActiveColor(), false);
+                return new CastleMove(board.getActiveColor(), false);
             }
             case "O-O-O" -> {
-                return new CastleMove(game.getActiveColor(), true);
+                return new CastleMove(board.getActiveColor(), true);
             }
         }
 
@@ -194,51 +201,17 @@ public interface Move {
                         candidates.add(new Square(f, r));
             }
 
-            Piece piece = new Piece(game.getActiveColor(), pieceType);
-            candidates.removeIf(square -> !game.getBoard().isPieceAt(square, piece));
+            Piece piece = new Piece(board.getActiveColor(), pieceType);
+            candidates.removeIf(square -> !board.isPieceAt(square, piece));
 
             if (candidates.size() == 1) {
                 from = candidates.stream().findAny().get();
             } else {
                 for (Square candidate : candidates) {
-
-                    int fileDiff = to.getFile() - candidate.getFile();
-                    int rankDiff = to.getRank() - candidate.getRank();
-                    int absFileDiff = Math.abs(fileDiff);
-                    int absRankDiff = Math.abs(rankDiff);
-
-                    if (pieceType == Piece.Type.ROOK || pieceType == Piece.Type.QUEEN) {
-                        if (fileDiff == 0 && game.getBoard().isFileOpen(candidate.getFile(), candidate.getRank(), to.getRank())
-                                || rankDiff == 0 && game.getBoard().isRankOpen(candidate.getRank(), candidate.getFile(), to.getFile())) {
-                            from = candidate;
-                            break;
-                        }
+                    if (board.isMovePossible(candidate, to)) {
+                        from = candidate;
+                        break;
                     }
-
-                    if (pieceType == Piece.Type.BISHOP || pieceType == Piece.Type.QUEEN) {
-                        if (absFileDiff == absRankDiff && game.getBoard().isDiagonalOpen(candidate.getFile(), candidate.getRank(), to.getFile(), to.getRank())) {
-                            from = candidate;
-                            break;
-                        }
-                    } else if (pieceType == Piece.Type.KNIGHT) {
-                        if (absFileDiff == 2 && absRankDiff == 1 || absFileDiff == 1 && absRankDiff == 2) {
-                            from = candidate;
-                            break;
-                        }
-                    } else if (pieceType == Piece.Type.KING) {
-                        if (absFileDiff <= 1 && absRankDiff <= 1) {
-                            from = candidate;
-                            break;
-                        }
-                    } else if (pieceType == Piece.Type.PAWN) {
-                        int pawnDirection = game.getActiveColor().getPawnDirection();
-                        int pawnStartRank = game.getActiveColor().getBackRank() + pawnDirection;
-                        if (absFileDiff == (capture ? 1 : 0) && (rankDiff == pawnDirection || !capture && rankDiff == 2 * pawnDirection && candidate.getRank() == pawnStartRank)) {
-                            from = candidate;
-                            break;
-                        }
-                    }
-
                 }
                 if (from == null)
                     throw new IllegalArgumentException("No valid piece for " + san);
@@ -247,7 +220,7 @@ public interface Move {
         }
 
         Move move = promotionType != null
-                ? new PromotionMove(pieceType, from, to, capture, promotionType)
+                ? new PromotionMove(from, to, capture, promotionType)
                 : new NormalMove(pieceType, from, to, capture);
         return checkStatus != null ? new CheckMove(move, checkStatus) : move;
     }

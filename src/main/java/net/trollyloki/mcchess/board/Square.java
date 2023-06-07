@@ -1,5 +1,6 @@
 package net.trollyloki.mcchess.board;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -33,6 +34,18 @@ public class Square {
      */
     public int getRank() {
         return rank;
+    }
+
+    /**
+     * Gets a square relative to this square.
+     *
+     * @param fileDelta difference in file
+     * @param rankDelta difference in rank
+     * @return new square
+     */
+    @Contract("_, _ -> new")
+    public @NotNull Square relative(int fileDelta, int rankDelta) {
+        return new Square(file + fileDelta, rank + rankDelta);
     }
 
     /**

@@ -13,13 +13,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
-public class PhysicalBoard implements Board {
+public class PhysicalBoard extends Board {
 
     private final @NotNull Location cornerLocation;
     private final @NotNull BlockFace attachmentFace;
     private final @NotNull Vector rankDirection, fileDirection;
-
-    private @NotNull String site = ChessPlugin.getDefaultSite();
 
     /**
      * Defines a new chess board.
@@ -41,16 +39,8 @@ public class PhysicalBoard implements Board {
         this.attachmentFace = attachmentFace;
         this.rankDirection = rankDirection.clone().normalize();
         this.fileDirection = fileDirection.clone().normalize();
-    }
 
-    @Override
-    public @NotNull String getSite() {
-        return site;
-    }
-
-    @Override
-    public void setSite(@NotNull String site) {
-        this.site = site;
+        validateCastling();
     }
 
     /**
@@ -164,11 +154,12 @@ public class PhysicalBoard implements Board {
 
     @Override
     public String toString() {
-        return "Board{" +
+        return "PhysicalBoard{" +
                 "cornerLocation=" + cornerLocation +
                 ", attachmentFace=" + attachmentFace +
                 ", rankDirection=" + rankDirection +
                 ", fileDirection=" + fileDirection +
+                ", fen=" + toFEN() +
                 '}';
     }
 

@@ -1,6 +1,7 @@
 package net.trollyloki.mcchess.game.player;
 
-import net.trollyloki.mcchess.game.Game;
+import net.trollyloki.mcchess.board.Board;
+import net.trollyloki.mcchess.game.move.Move;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.CompletableFuture;
@@ -15,11 +16,11 @@ public interface ChessPlayer {
     @NotNull String getName();
 
     /**
-     * Plays a move in a game.
+     * Chooses a move to play on a board.
      *
-     * @param game game
-     * @return {@code true} if a move was made, or {@code false} if the player has not moved yet
+     * @param board board
+     * @return future to completed with the chosen move
      */
-    @NotNull CompletableFuture<Boolean> play(@NotNull Game game);
+    @NotNull CompletableFuture<Move> chooseMove(@NotNull Board board);
 
 }

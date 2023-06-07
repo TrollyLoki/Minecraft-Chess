@@ -42,8 +42,10 @@ public class ChessPlugin extends JavaPlugin {
         saveDefaultConfig();
         reloadConfig();
 
+        ChessCommand chessCommand = new ChessCommand();
+        getServer().getPluginManager().registerEvents(chessCommand, this);
         //noinspection DataFlowIssue
-        getCommand("chess").setExecutor(new ChessCommand());
+        getCommand("chess").setExecutor(chessCommand);
 
     }
 
